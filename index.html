@@ -172,6 +172,10 @@
     if (prev && [...catSelect.options].some(o => o.value === prev)) catSelect.value = prev;
   }
 
+  newCatInput.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); document.getElementById('add-cat-btn').click(); }
+  });
+
   document.getElementById('add-cat-btn').addEventListener('click', () => {
     const name = newCatInput.value.trim();
     if (!name) return;
@@ -199,7 +203,6 @@
 
   function buildYearSelect() {
     const years = getYears();
-    const prev = parseInt(yearSelect.value, 10);
     yearSelect.innerHTML = '';
     years.forEach(y => {
       const opt = document.createElement('option');
