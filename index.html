@@ -112,7 +112,12 @@
 
 <script>
   const STORAGE_KEY = 'home_budget_txns';
-  let transactions = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+  let transactions;
+  try {
+    transactions = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+  } catch {
+    transactions = [];
+  }
 
   const form = document.getElementById('txn-form');
   const list = document.getElementById('txn-list');
@@ -133,32 +138,45 @@
     const sorted = [...transactions].sort((a, b) => b.date.localeCompare(a.date));
     sorted.forEach(t => {
       const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td>${t.date}</td>
-        <td>${t.desc}</td>
-        <td>${t.category || '—'}</td>
-        <td><span class="badge ${t.type}">${t.type}</span></td>
-        <td>${fmt(t.amount)}</td>
-        <td><button class="del-btn" data-id="${t.id}" title="Delete">✕</button></td>
-      `;
+      const tdDate = document.createElement('td');
+      tdDate.textContent = t.date;
+      const tdDesc = document.createElement('td');
+      tdDesc.textContent = t.desc;
+      const tdCat = document.createElement('td');
+      tdCat.textContent = t.category || '—';
+      const tdType = document.createElement('td');
+      const badge = document.createElement('span');
+      badge.className = 'badge ' + t.type;
+      badge.textContent = t.type;
+      tdType.appendChild(badge);
+      const tdAmt = document.createElement('td');
+      tdAmt.textContent = fmt(t.amountCents / 100);
+      const tdDel = document.createElement('td');
+      const delBtn = document.createElement('button');
+      delBtn.className = 'del-btn';
+      delBtn.dataset.id = t.id;
+      delBtn.title = 'Delete';
+      delBtn.textContent = '✕';
+      tdDel.appendChild(delBtn);
+      [tdDate, tdDesc, tdCat, tdType, tdAmt, tdDel].forEach(td => tr.appendChild(td));
       list.appendChild(tr);
     });
     emptyMsg.style.display = transactions.length ? 'none' : 'block';
 
-    const income = transactions.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
-    const expenses = transactions.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
-    document.getElementById('total-income').textContent = fmt(income);
-    document.getElementById('total-expenses').textContent = fmt(expenses);
-    document.getElementById('balance').textContent = fmt(income - expenses);
+    const income = transactions.filter(t => t.type === 'income').reduce((s, t) => s + t.amountCents, 0);
+    const expenses = transactions.filter(t => t.type === 'expense').reduce((s, t) => s + t.amountCents, 0);
+    document.getElementById('total-income').textContent = fmt(income / 100);
+    document.getElementById('total-expenses').textContent = fmt(expenses / 100);
+    document.getElementById('balance').textContent = fmt((income - expenses) / 100);
   }
 
   form.addEventListener('submit', e => {
     e.preventDefault();
     const type = form.querySelector('input[name=type]:checked').value;
     transactions.push({
-      id: Date.now(),
+      id: crypto.randomUUID(),
       desc: document.getElementById('desc').value.trim(),
-      amount: parseFloat(document.getElementById('amount').value),
+      amountCents: Math.round(parseFloat(document.getElementById('amount').value) * 100),
       category: document.getElementById('category').value.trim(),
       date: document.getElementById('date').value,
       type
@@ -173,7 +191,7 @@
   list.addEventListener('click', e => {
     const btn = e.target.closest('.del-btn');
     if (!btn) return;
-    const id = Number(btn.dataset.id);
+    const id = btn.dataset.id;
     transactions = transactions.filter(t => t.id !== id);
     save();
     render();
