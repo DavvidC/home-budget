@@ -1,37 +1,37 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="pl">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Home Budget</title>
+  <title>Domowy Budżet</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: system-ui, sans-serif; background: #f0f2f5; color: #222; }
-    header { background: #2563eb; color: #fff; padding: 1rem 2rem; }
-    header h1 { font-size: 1.5rem; }
+    header { background: linear-gradient(135deg, #1e40af 0%, #2563eb 60%, #3b82f6 100%); color: #fff; padding: 1.25rem 2rem; box-shadow: 0 2px 8px rgba(37,99,235,.35); }
+    header h1 { font-size: 1.5rem; font-weight: 700; letter-spacing: .02em; }
     .summary { display: flex; gap: 1rem; padding: 1.5rem 2rem; flex-wrap: wrap; }
-    .card { flex: 1; min-width: 160px; background: #fff; border-radius: 8px; padding: 1rem 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,.1); }
-    .card .label { font-size: .75rem; text-transform: uppercase; letter-spacing: .05em; color: #666; }
-    .card .amount { font-size: 1.75rem; font-weight: 700; margin-top: .25rem; }
+    .card { flex: 1; min-width: 160px; background: #fff; border-radius: 10px; padding: 1rem 1.5rem; box-shadow: 0 2px 8px rgba(0,0,0,.10), 0 1px 2px rgba(0,0,0,.06); }
+    .card .label { font-size: .75rem; text-transform: uppercase; letter-spacing: .06em; color: #6b7280; font-weight: 600; }
+    .card .amount { font-size: 1.75rem; font-weight: 700; margin-top: .35rem; }
     .card.income .amount { color: #16a34a; }
     .card.expenses .amount { color: #dc2626; }
     .card.balance .amount { color: #2563eb; }
     .main { display: flex; gap: 1.5rem; padding: 0 2rem 2rem; flex-wrap: wrap; }
-    .form-section, .transactions-section { background: #fff; border-radius: 8px; padding: 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,.1); }
+    .form-section, .transactions-section { background: #fff; border-radius: 10px; padding: 1.5rem; box-shadow: 0 2px 8px rgba(0,0,0,.10), 0 1px 2px rgba(0,0,0,.06); }
     .form-section { flex: 0 0 300px; }
     .transactions-section { flex: 1; min-width: 280px; }
-    h2 { font-size: 1rem; font-weight: 600; margin-bottom: 1rem; }
+    h2 { font-size: 1rem; font-weight: 700; margin-bottom: 1rem; color: #111827; letter-spacing: .01em; }
     .form-group { margin-bottom: .75rem; }
-    label { display: block; font-size: .8rem; color: #555; margin-bottom: .25rem; }
+    label { display: block; font-size: .8rem; color: #555; margin-bottom: .25rem; font-weight: 500; }
     input, select { width: 100%; padding: .5rem .75rem; border: 1px solid #d1d5db; border-radius: 6px; font-size: .9rem; }
     input:focus, select:focus { outline: 2px solid #2563eb; border-color: transparent; }
     .radio-group { display: flex; gap: .75rem; margin-top: .25rem; }
     .radio-group label { display: flex; align-items: center; gap: .35rem; font-size: .9rem; color: #222; cursor: pointer; }
     .radio-group input { width: auto; }
-    button[type=submit] { width: 100%; background: #2563eb; color: #fff; border: none; padding: .6rem; border-radius: 6px; font-size: .95rem; cursor: pointer; margin-top: .5rem; }
-    button[type=submit]:hover { background: #1d4ed8; }
+    button[type=submit] { width: 100%; background: linear-gradient(135deg, #2563eb, #1d4ed8); color: #fff; border: none; padding: .65rem; border-radius: 6px; font-size: .95rem; cursor: pointer; margin-top: .5rem; font-weight: 600; box-shadow: 0 2px 6px rgba(37,99,235,.35); }
+    button[type=submit]:hover { background: linear-gradient(135deg, #1d4ed8, #1e40af); }
     table { width: 100%; border-collapse: collapse; font-size: .9rem; }
-    th { text-align: left; padding: .5rem .75rem; font-size: .75rem; text-transform: uppercase; letter-spacing: .05em; color: #666; border-bottom: 1px solid #e5e7eb; }
+    th { text-align: left; padding: .5rem .75rem; font-size: .75rem; text-transform: uppercase; letter-spacing: .05em; color: #6b7280; border-bottom: 1px solid #e5e7eb; font-weight: 600; }
     td { padding: .6rem .75rem; border-bottom: 1px solid #f3f4f6; }
     tr:last-child td { border-bottom: none; }
     .badge { display: inline-block; padding: .15rem .5rem; border-radius: 999px; font-size: .75rem; font-weight: 600; }
@@ -43,70 +43,70 @@
   </style>
 </head>
 <body>
-<header><h1>Home Budget</h1></header>
+<header><h1>Domowy Budżet</h1></header>
 
 <div class="summary">
   <div class="card income">
-    <div class="label">Income</div>
-    <div class="amount" id="total-income">$0.00</div>
+    <div class="label">Przychody</div>
+    <div class="amount" id="total-income">0,00 zł</div>
   </div>
   <div class="card expenses">
-    <div class="label">Expenses</div>
-    <div class="amount" id="total-expenses">$0.00</div>
+    <div class="label">Wydatki</div>
+    <div class="amount" id="total-expenses">0,00 zł</div>
   </div>
   <div class="card balance">
-    <div class="label">Balance</div>
-    <div class="amount" id="balance">$0.00</div>
+    <div class="label">Saldo</div>
+    <div class="amount" id="balance">0,00 zł</div>
   </div>
 </div>
 
 <div class="main">
   <div class="form-section">
-    <h2>Add Transaction</h2>
+    <h2>Dodaj transakcję</h2>
     <form id="txn-form">
       <div class="form-group">
-        <label>Description</label>
-        <input type="text" id="desc" placeholder="e.g. Groceries" required>
+        <label>Opis</label>
+        <input type="text" id="desc" placeholder="np. Zakupy spożywcze" required>
       </div>
       <div class="form-group">
-        <label>Amount ($)</label>
+        <label>Kwota (zł)</label>
         <input type="number" id="amount" min="0.01" step="0.01" placeholder="0.00" required>
       </div>
       <div class="form-group">
-        <label>Category</label>
-        <input type="text" id="category" placeholder="e.g. Food">
+        <label>Kategoria</label>
+        <input type="text" id="category" placeholder="np. Jedzenie">
       </div>
       <div class="form-group">
-        <label>Date</label>
+        <label>Data</label>
         <input type="date" id="date" required>
       </div>
       <div class="form-group">
-        <label>Type</label>
+        <label>Typ</label>
         <div class="radio-group">
-          <label><input type="radio" name="type" value="income"> Income</label>
-          <label><input type="radio" name="type" value="expense" checked> Expense</label>
+          <label><input type="radio" name="type" value="income"> Przychód</label>
+          <label><input type="radio" name="type" value="expense" checked> Wydatek</label>
         </div>
       </div>
-      <button type="submit">Add Transaction</button>
+      <button type="submit">Dodaj transakcję</button>
     </form>
   </div>
 
   <div class="transactions-section">
-    <h2>Transactions</h2>
+    <h2>Transakcje</h2>
     <table>
       <thead>
         <tr>
-          <th>Date</th>
-          <th>Description</th>
-          <th>Category</th>
-          <th>Type</th>
-          <th>Amount</th>
+          <th>Data</th>
+          <th>Opis</th>
+          <th>Kategoria</th>
+          <th>Typ</th>
+          <th>Kwota</th>
           <th></th>
         </tr>
       </thead>
       <tbody id="txn-list"></tbody>
     </table>
-    <div class="empty" id="empty-msg">No transactions yet.</div>
+    <div class="empty" id="empty-msg">Brak transakcji.</div>
   </div>
 </div>
 
@@ -126,12 +126,14 @@
   document.getElementById('date').valueAsDate = new Date();
 
   function fmt(n) {
-    return '$' + n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    return n.toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, ' ') + ' zł';
   }
 
   function save() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(transactions));
   }
+
+  const BADGE_LABEL = { income: 'przychód', expense: 'wydatek' };
 
   function render() {
     list.innerHTML = '';
@@ -147,7 +149,7 @@
       const tdType = document.createElement('td');
       const badge = document.createElement('span');
       badge.className = 'badge ' + t.type;
-      badge.textContent = t.type;
+      badge.textContent = BADGE_LABEL[t.type] || t.type;
       tdType.appendChild(badge);
       const tdAmt = document.createElement('td');
       tdAmt.textContent = fmt(t.amountCents / 100);
@@ -155,7 +157,7 @@
       const delBtn = document.createElement('button');
       delBtn.className = 'del-btn';
       delBtn.dataset.id = t.id;
-      delBtn.title = 'Delete';
+      delBtn.title = 'Usuń';
       delBtn.textContent = '✕';
       tdDel.appendChild(delBtn);
       [tdDate, tdDesc, tdCat, tdType, tdAmt, tdDel].forEach(td => tr.appendChild(td));
