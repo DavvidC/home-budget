@@ -9,6 +9,12 @@
     body { font-family: system-ui, sans-serif; background: #f0f2f5; color: #222; }
     header { background: linear-gradient(135deg, #1e40af 0%, #2563eb 60%, #3b82f6 100%); color: #fff; padding: 1.25rem 2rem; box-shadow: 0 2px 8px rgba(37,99,235,.35); }
     header h1 { font-size: 1.5rem; font-weight: 700; letter-spacing: .02em; }
+    .filter-bar { background: #fff; padding: .75rem 2rem; border-bottom: 1px solid #e5e7eb; display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
+    .year-select { padding: .35rem .6rem; border: 1px solid #d1d5db; border-radius: 6px; font-size: .9rem; width: auto; }
+    .month-tabs { display: flex; gap: .35rem; flex-wrap: wrap; }
+    .month-tab { padding: .35rem .65rem; border: 1px solid #e5e7eb; border-radius: 6px; font-size: .78rem; cursor: pointer; background: #f9fafb; color: #9ca3af; white-space: nowrap; }
+    .month-tab.has-data { color: #374151; font-weight: 600; border-color: #d1d5db; }
+    .month-tab.active { background: #2563eb; color: #fff; border-color: #2563eb; font-weight: 600; }
     .summary { display: flex; gap: 1rem; padding: 1.5rem 2rem; flex-wrap: wrap; }
     .card { flex: 1; min-width: 160px; background: #fff; border-radius: 10px; padding: 1rem 1.5rem; box-shadow: 0 2px 8px rgba(0,0,0,.10), 0 1px 2px rgba(0,0,0,.06); }
     .card .label { font-size: .75rem; text-transform: uppercase; letter-spacing: .06em; color: #6b7280; font-weight: 600; }
@@ -28,6 +34,10 @@
     .radio-group { display: flex; gap: .75rem; margin-top: .25rem; }
     .radio-group label { display: flex; align-items: center; gap: .35rem; font-size: .9rem; color: #222; cursor: pointer; }
     .radio-group input { width: auto; }
+    .add-cat-row { display: flex; gap: .4rem; margin-top: .4rem; }
+    .add-cat-row input { flex: 1; width: auto; }
+    .add-cat-btn { flex-shrink: 0; padding: .5rem .75rem; background: #f3f4f6; border: 1px solid #d1d5db; border-radius: 6px; cursor: pointer; font-size: 1rem; line-height: 1; }
+    .add-cat-btn:hover { background: #e5e7eb; }
     button[type=submit] { width: 100%; background: linear-gradient(135deg, #2563eb, #1d4ed8); color: #fff; border: none; padding: .65rem; border-radius: 6px; font-size: .95rem; cursor: pointer; margin-top: .5rem; font-weight: 600; box-shadow: 0 2px 6px rgba(37,99,235,.35); }
     button[type=submit]:hover { background: linear-gradient(135deg, #1d4ed8, #1e40af); }
     table { width: 100%; border-collapse: collapse; font-size: .9rem; }
@@ -44,6 +54,11 @@
 </head>
 <body>
 <header><h1>Domowy Budżet</h1></header>
+
+<div class="filter-bar">
+  <select id="year-select" class="year-select"></select>
+  <div class="month-tabs" id="month-tabs"></div>
+</div>
 
 <div class="summary">
   <div class="card income">
@@ -74,7 +89,11 @@
       </div>
       <div class="form-group">
         <label>Kategoria</label>
-        <input type="text" id="category" placeholder="np. Jedzenie">
+        <select id="category"></select>
+        <div class="add-cat-row">
+          <input type="text" id="new-cat" placeholder="Nowa kategoria...">
+          <button type="button" class="add-cat-btn" id="add-cat-btn">+</button>
+        </div>
       </div>
       <div class="form-group">
         <label>Data</label>
@@ -112,32 +131,129 @@
 
 <script>
   const STORAGE_KEY = 'home_budget_txns';
+  const CATS_KEY = 'home_budget_cats';
+  const BUILT_IN_CATS = ['Wypłata', 'Jedzenie', 'Prąd', 'Leasing', 'Paliwo', 'Inne'];
+  const MONTH_NAMES = ['Styczeń','Luty','Marzec','Kwiecień','Maj','Czerwiec','Lipiec','Sierpień','Wrzesień','Październik','Listopad','Grudzień'];
+
   let transactions;
-  try {
-    transactions = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-  } catch {
-    transactions = [];
-  }
+  try { transactions = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); } catch { transactions = []; }
+  let customCats;
+  try { customCats = JSON.parse(localStorage.getItem(CATS_KEY) || '[]'); } catch { customCats = []; }
+
+  const today = new Date();
+  let activeYear = today.getFullYear();
+  let activeMonth = today.getMonth() + 1;
 
   const form = document.getElementById('txn-form');
   const list = document.getElementById('txn-list');
   const emptyMsg = document.getElementById('empty-msg');
+  const catSelect = document.getElementById('category');
+  const newCatInput = document.getElementById('new-cat');
+  const yearSelect = document.getElementById('year-select');
+  const monthTabsEl = document.getElementById('month-tabs');
 
-  document.getElementById('date').valueAsDate = new Date();
+  function saveTransactions() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(transactions));
+  }
+
+  function saveCustomCats() {
+    localStorage.setItem(CATS_KEY, JSON.stringify(customCats));
+  }
+
+  function buildCategorySelect() {
+    const prev = catSelect.value;
+    catSelect.innerHTML = '';
+    [...BUILT_IN_CATS, ...customCats].forEach(c => {
+      const opt = document.createElement('option');
+      opt.value = c;
+      opt.textContent = c;
+      catSelect.appendChild(opt);
+    });
+    if (prev && [...catSelect.options].some(o => o.value === prev)) catSelect.value = prev;
+  }
+
+  document.getElementById('add-cat-btn').addEventListener('click', () => {
+    const name = newCatInput.value.trim();
+    if (!name) return;
+    if ([...BUILT_IN_CATS, ...customCats].includes(name)) {
+      catSelect.value = name;
+      newCatInput.value = '';
+      return;
+    }
+    customCats.push(name);
+    saveCustomCats();
+    buildCategorySelect();
+    catSelect.value = name;
+    newCatInput.value = '';
+  });
 
   function fmt(n) {
     return n.toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, ' ') + ' zł';
   }
 
-  function save() {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(transactions));
+  function getYears() {
+    const yrs = new Set([today.getFullYear()]);
+    transactions.forEach(t => yrs.add(parseInt(t.date.slice(0, 4), 10)));
+    return [...yrs].sort((a, b) => b - a);
   }
 
-  const BADGE_LABEL = { income: 'przychód', expense: 'wydatek' };
+  function buildYearSelect() {
+    const years = getYears();
+    const prev = parseInt(yearSelect.value, 10);
+    yearSelect.innerHTML = '';
+    years.forEach(y => {
+      const opt = document.createElement('option');
+      opt.value = y;
+      opt.textContent = y;
+      yearSelect.appendChild(opt);
+    });
+    if (years.includes(activeYear)) {
+      yearSelect.value = activeYear;
+    } else {
+      activeYear = years[0];
+      yearSelect.value = activeYear;
+    }
+  }
+
+  function buildMonthTabs() {
+    monthTabsEl.innerHTML = '';
+    const monthsWithData = new Set(
+      transactions
+        .filter(t => parseInt(t.date.slice(0, 4), 10) === activeYear)
+        .map(t => parseInt(t.date.slice(5, 7), 10))
+    );
+    MONTH_NAMES.forEach((name, i) => {
+      const m = i + 1;
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'month-tab' +
+        (monthsWithData.has(m) ? ' has-data' : '') +
+        (m === activeMonth ? ' active' : '');
+      btn.textContent = name;
+      btn.dataset.month = m;
+      monthTabsEl.appendChild(btn);
+    });
+  }
+
+  monthTabsEl.addEventListener('click', e => {
+    const btn = e.target.closest('.month-tab');
+    if (!btn) return;
+    activeMonth = parseInt(btn.dataset.month, 10);
+    buildMonthTabs();
+    render();
+  });
+
+  yearSelect.addEventListener('change', () => {
+    activeYear = parseInt(yearSelect.value, 10);
+    buildMonthTabs();
+    render();
+  });
 
   function render() {
     list.innerHTML = '';
-    const sorted = [...transactions].sort((a, b) => b.date.localeCompare(a.date));
+    const prefix = activeYear + '-' + String(activeMonth).padStart(2, '0');
+    const filtered = transactions.filter(t => t.date.startsWith(prefix));
+    const sorted = [...filtered].sort((a, b) => b.date.localeCompare(a.date));
     sorted.forEach(t => {
       const tr = document.createElement('tr');
       const tdDate = document.createElement('td');
@@ -149,7 +265,7 @@
       const tdType = document.createElement('td');
       const badge = document.createElement('span');
       badge.className = 'badge ' + t.type;
-      badge.textContent = BADGE_LABEL[t.type] || t.type;
+      badge.textContent = t.type === 'income' ? 'przychód' : 'wydatek';
       tdType.appendChild(badge);
       const tdAmt = document.createElement('td');
       tdAmt.textContent = fmt(t.amountCents / 100);
@@ -163,10 +279,10 @@
       [tdDate, tdDesc, tdCat, tdType, tdAmt, tdDel].forEach(td => tr.appendChild(td));
       list.appendChild(tr);
     });
-    emptyMsg.style.display = transactions.length ? 'none' : 'block';
+    emptyMsg.style.display = filtered.length ? 'none' : 'block';
 
-    const income = transactions.filter(t => t.type === 'income').reduce((s, t) => s + t.amountCents, 0);
-    const expenses = transactions.filter(t => t.type === 'expense').reduce((s, t) => s + t.amountCents, 0);
+    const income = filtered.filter(t => t.type === 'income').reduce((s, t) => s + t.amountCents, 0);
+    const expenses = filtered.filter(t => t.type === 'expense').reduce((s, t) => s + t.amountCents, 0);
     document.getElementById('total-income').textContent = fmt(income / 100);
     document.getElementById('total-expenses').textContent = fmt(expenses / 100);
     document.getElementById('balance').textContent = fmt((income - expenses) / 100);
@@ -175,30 +291,41 @@
   form.addEventListener('submit', e => {
     e.preventDefault();
     const type = form.querySelector('input[name=type]:checked').value;
+    const dateVal = document.getElementById('date').value;
     transactions.push({
       id: crypto.randomUUID(),
       desc: document.getElementById('desc').value.trim(),
       amountCents: Math.round(parseFloat(document.getElementById('amount').value) * 100),
-      category: document.getElementById('category').value.trim(),
-      date: document.getElementById('date').value,
+      category: catSelect.value,
+      date: dateVal,
       type
     });
-    save();
+    saveTransactions();
+    activeYear = parseInt(dateVal.slice(0, 4), 10);
+    activeMonth = parseInt(dateVal.slice(5, 7), 10);
+    buildYearSelect();
+    buildMonthTabs();
     render();
     form.reset();
     document.getElementById('date').valueAsDate = new Date();
     form.querySelector('input[name=type][value=expense]').checked = true;
+    buildCategorySelect();
   });
 
   list.addEventListener('click', e => {
     const btn = e.target.closest('.del-btn');
     if (!btn) return;
-    const id = btn.dataset.id;
-    transactions = transactions.filter(t => t.id !== id);
-    save();
+    transactions = transactions.filter(t => t.id !== btn.dataset.id);
+    saveTransactions();
+    buildYearSelect();
+    buildMonthTabs();
     render();
   });
 
+  document.getElementById('date').valueAsDate = new Date();
+  buildCategorySelect();
+  buildYearSelect();
+  buildMonthTabs();
   render();
 </script>
 </body>
