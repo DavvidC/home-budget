@@ -145,17 +145,12 @@
 </div>
 
 <script>
-  let STORAGE_KEY, CATS_KEY;
-
   fetch('/api/me').then(r => {
     if (!r.ok) { window.location.href = '/login'; return; }
     return r.json();
   }).then(user => {
     if (!user) return;
-    STORAGE_KEY = 'home_budget_txns_' + user.id;
-    CATS_KEY = 'home_budget_cats_' + user.id;
-    const nameEl = document.getElementById('user-name');
-    if (nameEl) nameEl.textContent = user.name;
+    document.getElementById('user-name').textContent = user.name;
     initApp();
   }).catch(() => { window.location.href = '/login'; });
 
@@ -163,10 +158,8 @@
   const BUILT_IN_CATS = ['Wypłata', 'Jedzenie', 'Prąd', 'Leasing', 'Paliwo', 'Inne'];
   const MONTH_NAMES = ['Styczeń','Luty','Marzec','Kwiecień','Maj','Czerwiec','Lipiec','Sierpień','Wrzesień','Październik','Listopad','Grudzień'];
 
-  let transactions;
-  try { transactions = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); } catch { transactions = []; }
-  let customCats;
-  try { customCats = JSON.parse(localStorage.getItem(CATS_KEY) || '[]'); } catch { customCats = []; }
+  let transactions = [];
+  let customCats = [];
 
   const today = new Date();
   let activeYear = today.getFullYear();
@@ -180,12 +173,17 @@
   const yearSelect = document.getElementById('year-select');
   const monthTabsEl = document.getElementById('month-tabs');
 
-  function saveTransactions() {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(transactions));
-  }
-
-  function saveCustomCats() {
-    localStorage.setItem(CATS_KEY, JSON.stringify(customCats));
+  async function loadAll() {
+    const [txns, cats] = await Promise.all([
+      fetch('/api/transactions').then(r => r.json()),
+      fetch('/api/categories').then(r => r.json()),
+    ]);
+    transactions = txns;
+    customCats = cats;
+    buildCategorySelect();
+    buildYearSelect();
+    buildMonthTabs();
+    render();
   }
 
   function buildCategorySelect() {
@@ -204,7 +202,7 @@
     if (e.key === 'Enter') { e.preventDefault(); document.getElementById('add-cat-btn').click(); }
   });
 
-  document.getElementById('add-cat-btn').addEventListener('click', () => {
+  document.getElementById('add-cat-btn').addEventListener('click', async () => {
     const name = newCatInput.value.trim();
     if (!name) return;
     if ([...BUILT_IN_CATS, ...customCats].includes(name)) {
@@ -212,8 +210,11 @@
       newCatInput.value = '';
       return;
     }
-    customCats.push(name);
-    saveCustomCats();
+    const cats = await fetch('/api/categories', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name })
+    }).then(r => r.json());
+    customCats = cats;
     buildCategorySelect();
     catSelect.value = name;
     newCatInput.value = '';
@@ -287,25 +288,18 @@
     const sorted = [...filtered].sort((a, b) => b.date.localeCompare(a.date));
     sorted.forEach(t => {
       const tr = document.createElement('tr');
-      const tdDate = document.createElement('td');
-      tdDate.textContent = t.date;
-      const tdDesc = document.createElement('td');
-      tdDesc.textContent = t.desc;
-      const tdCat = document.createElement('td');
-      tdCat.textContent = t.category || '—';
+      const tdDate = document.createElement('td'); tdDate.textContent = t.date;
+      const tdDesc = document.createElement('td'); tdDesc.textContent = t.desc;
+      const tdCat = document.createElement('td'); tdCat.textContent = t.category || '—';
       const tdType = document.createElement('td');
       const badge = document.createElement('span');
       badge.className = 'badge ' + t.type;
       badge.textContent = t.type === 'income' ? 'przychód' : 'wydatek';
       tdType.appendChild(badge);
-      const tdAmt = document.createElement('td');
-      tdAmt.textContent = fmt(t.amountCents / 100);
+      const tdAmt = document.createElement('td'); tdAmt.textContent = fmt(t.amountCents / 100);
       const tdDel = document.createElement('td');
       const delBtn = document.createElement('button');
-      delBtn.className = 'del-btn';
-      delBtn.dataset.id = t.id;
-      delBtn.title = 'Usuń';
-      delBtn.textContent = '✕';
+      delBtn.className = 'del-btn'; delBtn.dataset.id = t.id; delBtn.title = 'Usuń'; delBtn.textContent = '✕';
       tdDel.appendChild(delBtn);
       [tdDate, tdDesc, tdCat, tdType, tdAmt, tdDel].forEach(td => tr.appendChild(td));
       list.appendChild(tr);
@@ -319,19 +313,21 @@
     document.getElementById('balance').textContent = fmt((income - expenses) / 100);
   }
 
-  form.addEventListener('submit', e => {
+  form.addEventListener('submit', async e => {
     e.preventDefault();
     const type = form.querySelector('input[name=type]:checked').value;
     const dateVal = document.getElementById('date').value;
-    transactions.push({
-      id: crypto.randomUUID(),
-      desc: document.getElementById('desc').value.trim(),
-      amountCents: Math.round(parseFloat(document.getElementById('amount').value) * 100),
-      category: catSelect.value,
-      date: dateVal,
-      type
-    });
-    saveTransactions();
+    const txn = await fetch('/api/transactions', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id: crypto.randomUUID(),
+        desc: document.getElementById('desc').value.trim(),
+        amountCents: Math.round(parseFloat(document.getElementById('amount').value) * 100),
+        category: catSelect.value,
+        date: dateVal, type
+      })
+    }).then(r => r.json());
+    transactions.push(txn);
     activeYear = parseInt(dateVal.slice(0, 4), 10);
     activeMonth = parseInt(dateVal.slice(5, 7), 10);
     buildYearSelect();
@@ -343,21 +339,25 @@
     buildCategorySelect();
   });
 
-  list.addEventListener('click', e => {
+  list.addEventListener('click', async e => {
     const btn = e.target.closest('.del-btn');
     if (!btn) return;
+    await fetch('/api/transactions/' + btn.dataset.id, { method: 'DELETE' });
     transactions = transactions.filter(t => t.id !== btn.dataset.id);
-    saveTransactions();
     buildYearSelect();
     buildMonthTabs();
     render();
   });
 
   document.getElementById('date').valueAsDate = new Date();
-  buildCategorySelect();
-  buildYearSelect();
-  buildMonthTabs();
-  render();
+  loadAll();
+  setInterval(async () => {
+    const txns = await fetch('/api/transactions').then(r => r.json());
+    transactions = txns;
+    buildYearSelect();
+    buildMonthTabs();
+    render();
+  }, 10000);
   } // end initApp
 </script>
 </body>
