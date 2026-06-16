@@ -12,10 +12,13 @@ passport.use(new GoogleStrategy({
   clientSecret: process.env.GOOGLE_CLIENT_SECRET,
   callbackURL: 'http://localhost:' + (process.env.PORT || 8001) + '/auth/google/callback'
 }, (accessToken, refreshToken, profile, done) => {
+  const email = profile.emails[0].value;
+  const allowed = (process.env.ALLOWED_EMAILS || '').split(',').map(e => e.trim());
+  if (!allowed.includes(email)) return done(null, false);
   done(null, {
     id: profile.id,
     name: profile.displayName,
-    email: profile.emails[0].value,
+    email,
     photo: profile.photos[0] && profile.photos[0].value
   });
 }));
