@@ -4,6 +4,19 @@ const session = require('express-session');
 const passport = require('passport');
 const GoogleStrategy = require('passport-google-oauth20').Strategy;
 const path = require('path');
+const fs = require('fs');
+
+const DATA_FILE = path.join(__dirname, 'budget-data.json');
+
+function loadData() {
+  try { return JSON.parse(fs.readFileSync(DATA_FILE, 'utf8')); } catch { return { transactions: [], categories: [] }; }
+}
+
+function saveData() {
+  fs.writeFileSync(DATA_FILE, JSON.stringify(store, null, 2));
+}
+
+const store = loadData();
 
 const app = express();
 
@@ -93,6 +106,39 @@ app.get('/', requireAuth, (req, res) => {
   res.sendFile(path.join(__dirname, 'index.html'), {
     headers: { 'X-User-Id': req.user.id, 'X-User-Name': encodeURIComponent(req.user.name), 'X-User-Email': req.user.email }
   });
+});
+
+app.use(express.json());
+
+app.get('/api/transactions', requireAuth, (req, res) => {
+  res.json(store.transactions);
+});
+
+app.post('/api/transactions', requireAuth, (req, res) => {
+  const { id, desc, amountCents, category, date, type } = req.body;
+  const txn = { id, desc, amountCents, category, date, type };
+  store.transactions.push(txn);
+  saveData();
+  res.json(txn);
+});
+
+app.delete('/api/transactions/:id', requireAuth, (req, res) => {
+  store.transactions = store.transactions.filter(t => t.id !== req.params.id);
+  saveData();
+  res.json({ ok: true });
+});
+
+app.get('/api/categories', requireAuth, (req, res) => {
+  res.json(store.categories);
+});
+
+app.post('/api/categories', requireAuth, (req, res) => {
+  const { name } = req.body;
+  if (!store.categories.includes(name)) {
+    store.categories.push(name);
+    saveData();
+  }
+  res.json(store.categories);
 });
 
 app.use(express.static(__dirname));
