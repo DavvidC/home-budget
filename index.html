@@ -157,7 +157,7 @@
     const nameEl = document.getElementById('user-name');
     if (nameEl) nameEl.textContent = user.name;
     initApp();
-  });
+  }).catch(() => { window.location.href = '/login'; });
 
   function initApp() {
   const BUILT_IN_CATS = ['Wypłata', 'Jedzenie', 'Prąd', 'Leasing', 'Paliwo', 'Inne'];

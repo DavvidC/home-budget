@@ -82,14 +82,12 @@ app.get('/api/me', requireAuth, (req, res) => {
 app.post('/logout', (req, res, next) => {
   req.logout(err => {
     if (err) return next(err);
-    req.session.destroy(() => res.redirect('/login'));
+    req.session.destroy(err => { if (err) console.error('session destroy error:', err); res.redirect('/login'); });
   });
 });
 
 app.get('/', requireAuth, (req, res) => {
-  res.sendFile(path.join(__dirname, 'index.html'), {
-    headers: { 'X-User-Id': req.user.id, 'X-User-Name': req.user.name, 'X-User-Email': req.user.email }
-  });
+  res.sendFile(path.join(__dirname, 'index.html'));
 });
 
 const PORT = process.env.PORT || 8001;
