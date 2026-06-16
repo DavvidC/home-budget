@@ -41,6 +41,9 @@ passport.use(new GoogleStrategy({
   clientSecret: process.env.GOOGLE_CLIENT_SECRET,
   callbackURL: APP_URL + '/auth/google/callback'
 }, (accessToken, refreshToken, profile, done) => {
+  const allowedEmails = (process.env.ALLOWED_EMAILS || '').split(',').map(e => e.trim().toLowerCase()).filter(Boolean);
+  const email = profile.emails[0].value.toLowerCase();
+  if (!allowedEmails.includes(email)) return done(null, false);
   done(null, {
     id: profile.id,
     name: profile.displayName,
