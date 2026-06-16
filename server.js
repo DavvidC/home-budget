@@ -76,13 +76,13 @@ app.get('/auth/google/callback',
 );
 
 app.get('/api/me', requireAuth, (req, res) => {
-  res.json({ email: req.user.email, name: req.user.name });
+  res.json({ id: req.user.id, email: req.user.email, name: req.user.name });
 });
 
 app.post('/logout', (req, res, next) => {
   req.logout(err => {
     if (err) return next(err);
-    res.redirect('/login');
+    req.session.destroy(() => res.redirect('/login'));
   });
 });
 
@@ -91,8 +91,6 @@ app.get('/', requireAuth, (req, res) => {
     headers: { 'X-User-Id': req.user.id, 'X-User-Name': req.user.name, 'X-User-Email': req.user.email }
   });
 });
-
-app.use(express.static(__dirname));
 
 const PORT = process.env.PORT || 8001;
 app.listen(PORT, () => console.log('Listening on http://localhost:' + PORT));

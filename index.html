@@ -147,9 +147,13 @@
 <script>
   let STORAGE_KEY, CATS_KEY;
 
-  fetch('/api/me').then(r => r.json()).then(user => {
-    STORAGE_KEY = 'home_budget_txns_' + user.email;
-    CATS_KEY = 'home_budget_cats_' + user.email;
+  fetch('/api/me').then(r => {
+    if (!r.ok) { window.location.href = '/login'; return; }
+    return r.json();
+  }).then(user => {
+    if (!user) return;
+    STORAGE_KEY = 'home_budget_txns_' + user.id;
+    CATS_KEY = 'home_budget_cats_' + user.id;
     const nameEl = document.getElementById('user-name');
     if (nameEl) nameEl.textContent = user.name;
     initApp();
