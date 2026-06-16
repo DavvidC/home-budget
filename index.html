@@ -50,10 +50,25 @@
     .del-btn { background: none; border: none; color: #9ca3af; cursor: pointer; font-size: 1rem; padding: 0 .25rem; }
     .del-btn:hover { color: #dc2626; }
     .empty { text-align: center; color: #9ca3af; padding: 2rem; }
+    .header-inner { display: flex; align-items: center; justify-content: space-between; }
+    .user-info { display: flex; align-items: center; gap: .75rem; }
+    .user-name { font-size: .9rem; opacity: .9; }
+    .logout-btn { background: rgba(255,255,255,.15); border: 1px solid rgba(255,255,255,.3); color: #fff; padding: .35rem .75rem; border-radius: 6px; font-size: .85rem; cursor: pointer; }
+    .logout-btn:hover { background: rgba(255,255,255,.25); }
   </style>
 </head>
 <body>
-<header><h1>Domowy Budżet</h1></header>
+<header>
+  <div class="header-inner">
+    <h1>Domowy Budżet</h1>
+    <div class="user-info">
+      <span class="user-name" id="user-name"></span>
+      <form action="/logout" method="post" style="margin:0">
+        <button type="submit" class="logout-btn">Wyloguj</button>
+      </form>
+    </div>
+  </div>
+</header>
 
 <div class="filter-bar">
   <select id="year-select" class="year-select"></select>
@@ -130,8 +145,17 @@
 </div>
 
 <script>
-  const STORAGE_KEY = 'home_budget_txns';
-  const CATS_KEY = 'home_budget_cats';
+  let STORAGE_KEY, CATS_KEY;
+
+  fetch('/api/me').then(r => r.json()).then(user => {
+    STORAGE_KEY = 'home_budget_txns_' + user.email;
+    CATS_KEY = 'home_budget_cats_' + user.email;
+    const nameEl = document.getElementById('user-name');
+    if (nameEl) nameEl.textContent = user.name;
+    initApp();
+  });
+
+  function initApp() {
   const BUILT_IN_CATS = ['Wypłata', 'Jedzenie', 'Prąd', 'Leasing', 'Paliwo', 'Inne'];
   const MONTH_NAMES = ['Styczeń','Luty','Marzec','Kwiecień','Maj','Czerwiec','Lipiec','Sierpień','Wrzesień','Październik','Listopad','Grudzień'];
 
@@ -330,6 +354,7 @@
   buildYearSelect();
   buildMonthTabs();
   render();
+  } // end initApp
 </script>
 </body>
 </html>
