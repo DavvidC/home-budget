@@ -91,7 +91,7 @@ app.post('/logout', (req, res, next) => {
 
 app.get('/', requireAuth, (req, res) => {
   res.sendFile(path.join(__dirname, 'index.html'), {
-    headers: { 'X-User-Id': req.user.id, 'X-User-Name': req.user.name, 'X-User-Email': req.user.email }
+    headers: { 'X-User-Id': req.user.id, 'X-User-Name': encodeURIComponent(req.user.name), 'X-User-Email': req.user.email }
   });
 });
 
