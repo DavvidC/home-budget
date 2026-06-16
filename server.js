@@ -146,7 +146,7 @@ app.delete('/api/transactions/:id', requireAuth, async (req, res) => {
 app.get('/api/categories', requireAuth, async (req, res) => {
   try {
     const { rows } = await pool.query('SELECT name FROM categories ORDER BY name');
-    res.json(rows.map(r => ({ name: r.name })));
+    res.json(rows.map(r => r.name));
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
