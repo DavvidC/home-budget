@@ -9,12 +9,11 @@
     body { font-family: system-ui, sans-serif; background: #f0f2f5; color: #222; }
     header { background: linear-gradient(135deg, #1e40af 0%, #2563eb 60%, #3b82f6 100%); color: #fff; padding: 1.25rem 2rem; box-shadow: 0 2px 8px rgba(37,99,235,.35); }
     header h1 { font-size: 1.5rem; font-weight: 700; letter-spacing: .02em; }
-    .filter-bar { background: #fff; padding: .75rem 2rem; border-bottom: 1px solid #e5e7eb; display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
-    .year-select { padding: .35rem .6rem; border: 1px solid #d1d5db; border-radius: 6px; font-size: .9rem; width: auto; }
-    .month-tabs { display: flex; gap: .35rem; flex-wrap: wrap; }
-    .month-tab { padding: .35rem .65rem; border: 1px solid #e5e7eb; border-radius: 6px; font-size: .78rem; cursor: pointer; background: #f9fafb; color: #9ca3af; white-space: nowrap; }
-    .month-tab.has-data { color: #374151; font-weight: 600; border-color: #d1d5db; }
-    .month-tab.active { background: #2563eb; color: #fff; border-color: #2563eb; font-weight: 600; }
+    .filter-bar { background: #fff; padding: .75rem 2rem; border-bottom: 1px solid #e5e7eb; display: flex; flex-direction: column; gap: .5rem; }
+    .preset-chips { display: flex; gap: .35rem; flex-wrap: wrap; }
+    .preset-chip { padding: .35rem .65rem; border: 1px solid #e5e7eb; border-radius: 6px; font-size: .78rem; cursor: pointer; background: #f9fafb; color: #374151; white-space: nowrap; }
+    .preset-chip.active { background: #2563eb; color: #fff; border-color: #2563eb; font-weight: 600; }
+    .custom-date-row { display: none; align-items: center; gap: .5rem; flex-wrap: wrap; }
     .summary { display: flex; gap: 1rem; padding: 1.5rem 2rem; flex-wrap: wrap; }
     .card { flex: 1; min-width: 160px; background: #fff; border-radius: 10px; padding: 1rem 1.5rem; box-shadow: 0 2px 8px rgba(0,0,0,.10), 0 1px 2px rgba(0,0,0,.06); }
     .card .label { font-size: .75rem; text-transform: uppercase; letter-spacing: .06em; color: #6b7280; font-weight: 600; }
@@ -74,8 +73,19 @@
 </header>
 
 <div class="filter-bar">
-  <select id="year-select" class="year-select"></select>
-  <div class="month-tabs" id="month-tabs"></div>
+  <div class="preset-chips" id="preset-chips">
+    <button type="button" class="preset-chip" data-preset="month">Ten miesiąc</button>
+    <button type="button" class="preset-chip" data-preset="week">Ostatni tydzień</button>
+    <button type="button" class="preset-chip" data-preset="2weeks">Ostatnie 2 tygodnie</button>
+    <button type="button" class="preset-chip" data-preset="30days">Ostatnie 30 dni</button>
+    <button type="button" class="preset-chip" data-preset="custom">Niestandardowy</button>
+  </div>
+  <div class="custom-date-row" id="filter-custom-row">
+    <label style="margin:0">Od:</label>
+    <input type="date" id="filter-from" style="width:auto">
+    <label style="margin:0">Do:</label>
+    <input type="date" id="filter-to" style="width:auto">
+  </div>
 </div>
 
 <div class="summary">
@@ -169,7 +179,6 @@
 
   async function initApp() {
   const BUILT_IN_CATS = ['Wypłata', 'Jedzenie', 'Prąd', 'Leasing', 'Paliwo', 'Inne'];
-  const MONTH_NAMES = ['Styczeń','Luty','Marzec','Kwiecień','Maj','Czerwiec','Lipiec','Sierpień','Wrzesień','Październik','Listopad','Grudzień'];
 
   let transactions = [];
   let customCats = [];
@@ -184,17 +193,11 @@
     customCats = cats.map(c => c.name);
   }
 
-  const today = new Date();
-  let activeYear = today.getFullYear();
-  let activeMonth = today.getMonth() + 1;
-
   const form = document.getElementById('txn-form');
   const list = document.getElementById('txn-list');
   const emptyMsg = document.getElementById('empty-msg');
   const catSelect = document.getElementById('category');
   const newCatInput = document.getElementById('new-cat');
-  const yearSelect = document.getElementById('year-select');
-  const monthTabsEl = document.getElementById('month-tabs');
 
   function buildCategorySelect() {
     const prev = catSelect.value;
@@ -235,67 +238,76 @@
     return n.toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, ' ') + ' zł';
   }
 
-  function getYears() {
-    const yrs = new Set([today.getFullYear()]);
-    transactions.forEach(t => yrs.add(parseInt(t.date.slice(0, 4), 10)));
-    return [...yrs].sort((a, b) => b - a);
+  function toYMD(d) {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
   }
 
-  function buildYearSelect() {
-    const years = getYears();
-    yearSelect.innerHTML = '';
-    years.forEach(y => {
-      const opt = document.createElement('option');
-      opt.value = y;
-      opt.textContent = y;
-      yearSelect.appendChild(opt);
-    });
-    if (years.includes(activeYear)) {
-      yearSelect.value = activeYear;
-    } else {
-      activeYear = years[0];
-      yearSelect.value = activeYear;
+  let filterFrom = '';
+  let filterTo = '';
+  let activePreset = 'month';
+
+  function setPreset(preset) {
+    activePreset = preset;
+    const now = new Date();
+    const todayStr = toYMD(now);
+
+    if (preset === 'month') {
+      filterFrom = todayStr.slice(0, 7) + '-01';
+      filterTo = toYMD(new Date(now.getFullYear(), now.getMonth() + 1, 0));
+    } else if (preset === 'week') {
+      const from = new Date(now);
+      from.setDate(from.getDate() - 6);
+      filterFrom = toYMD(from);
+      filterTo = todayStr;
+    } else if (preset === '2weeks') {
+      const from = new Date(now);
+      from.setDate(from.getDate() - 13);
+      filterFrom = toYMD(from);
+      filterTo = todayStr;
+    } else if (preset === '30days') {
+      const from = new Date(now);
+      from.setDate(from.getDate() - 29);
+      filterFrom = toYMD(from);
+      filterTo = todayStr;
+    } else if (preset === 'custom') {
+      const fromEl = document.getElementById('filter-from');
+      const toEl = document.getElementById('filter-to');
+      if (!fromEl.value) fromEl.value = todayStr;
+      if (!toEl.value) toEl.value = todayStr;
+      filterFrom = fromEl.value;
+      filterTo = toEl.value;
     }
-  }
 
-  function buildMonthTabs() {
-    monthTabsEl.innerHTML = '';
-    const monthsWithData = new Set(
-      transactions
-        .filter(t => parseInt(t.date.slice(0, 4), 10) === activeYear)
-        .map(t => parseInt(t.date.slice(5, 7), 10))
-    );
-    MONTH_NAMES.forEach((name, i) => {
-      const m = i + 1;
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'month-tab' +
-        (monthsWithData.has(m) ? ' has-data' : '') +
-        (m === activeMonth ? ' active' : '');
-      btn.textContent = name;
-      btn.dataset.month = m;
-      monthTabsEl.appendChild(btn);
+    document.querySelectorAll('.preset-chip').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.preset === preset);
     });
+    document.getElementById('filter-custom-row').style.display = preset === 'custom' ? 'flex' : 'none';
+
+    render();
   }
 
-  monthTabsEl.addEventListener('click', e => {
-    const btn = e.target.closest('.month-tab');
+  document.getElementById('preset-chips').addEventListener('click', e => {
+    const btn = e.target.closest('.preset-chip');
     if (!btn) return;
-    activeMonth = parseInt(btn.dataset.month, 10);
-    buildMonthTabs();
+    setPreset(btn.dataset.preset);
+  });
+
+  document.getElementById('filter-from').addEventListener('change', () => {
+    filterFrom = document.getElementById('filter-from').value;
     render();
   });
 
-  yearSelect.addEventListener('change', () => {
-    activeYear = parseInt(yearSelect.value, 10);
-    buildMonthTabs();
+  document.getElementById('filter-to').addEventListener('change', () => {
+    filterTo = document.getElementById('filter-to').value;
     render();
   });
 
   function render() {
     list.innerHTML = '';
-    const prefix = activeYear + '-' + String(activeMonth).padStart(2, '0');
-    const filtered = transactions.filter(t => t.date.startsWith(prefix));
+    const filtered = transactions.filter(t => t.date >= filterFrom && t.date <= filterTo);
     const sorted = [...filtered].sort((a, b) => b.date.localeCompare(a.date));
     sorted.forEach(t => {
       const tr = document.createElement('tr');
@@ -354,8 +366,6 @@
       `Zaimportowano ${result.imported} transakcji (Pominieto ${result.skipped} duplikatow)`;
     e.target.value = '';
     await loadData();
-    buildYearSelect();
-    buildMonthTabs();
     render();
   });
 
@@ -376,10 +386,6 @@
     });
     const saved = await res.json();
     transactions.push(saved);
-    activeYear = parseInt(dateVal.slice(0, 4), 10);
-    activeMonth = parseInt(dateVal.slice(5, 7), 10);
-    buildYearSelect();
-    buildMonthTabs();
     render();
     form.reset();
     document.getElementById('date').valueAsDate = new Date();
@@ -392,23 +398,17 @@
     if (!btn) return;
     await fetch('/api/transactions/' + btn.dataset.id, {method: 'DELETE'});
     transactions = transactions.filter(t => t.id !== btn.dataset.id);
-    buildYearSelect();
-    buildMonthTabs();
     render();
   });
 
   document.getElementById('date').valueAsDate = new Date();
   await loadData();
   buildCategorySelect();
-  buildYearSelect();
-  buildMonthTabs();
-  render();
+  setPreset('month');
 
   setInterval(async () => {
     await loadData();
     buildCategorySelect();
-    buildYearSelect();
-    buildMonthTabs();
     render();
   }, 10000);
   } // end initApp
