@@ -21,6 +21,10 @@ async function initDB() {
     ALTER TABLE transactions ADD COLUMN IF NOT EXISTS odbiorca TEXT;
     ALTER TABLE transactions ADD COLUMN IF NOT EXISTS comment TEXT;
     INSERT INTO categories(name) VALUES ('Wypłata'),('Jedzenie'),('Prąd'),('Leasing'),('Paliwo'),('Inne') ON CONFLICT DO NOTHING;
+    CREATE TABLE IF NOT EXISTS budgets (
+      category TEXT PRIMARY KEY,
+      limit_cents INTEGER NOT NULL
+    );
   `);
   console.log('DB ready');
 }
@@ -117,7 +121,7 @@ app.post('/logout', (req, res, next) => {
 });
 
 // ---------------------------------------------------------------------------
-// Budget API routes
+// Transaction API routes
 // ---------------------------------------------------------------------------
 app.get('/api/transactions', requireAuth, async (req, res) => {
   try {
@@ -248,6 +252,40 @@ app.post('/api/import', requireAuth, async (req, res) => {
       if (result.rowCount > 0) imported++; else skipped++;
     }
     res.json({ imported, skipped });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Budget API routes
+// ---------------------------------------------------------------------------
+app.get('/api/budgets', requireAuth, async (req, res) => {
+  try {
+    const { rows } = await pool.query('SELECT category, limit_cents AS "limitCents" FROM budgets ORDER BY category');
+    res.json(rows);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post('/api/budgets', requireAuth, async (req, res) => {
+  try {
+    const { category, limitCents } = req.body;
+    const { rows } = await pool.query(
+      'INSERT INTO budgets(category, limit_cents) VALUES($1, $2) ON CONFLICT (category) DO UPDATE SET limit_cents = $2 RETURNING category, limit_cents AS "limitCents"',
+      [category, limitCents]
+    );
+    res.json(rows[0]);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.delete('/api/budgets/:category', requireAuth, async (req, res) => {
+  try {
+    await pool.query('DELETE FROM budgets WHERE category = $1', [req.params.category]);
+    res.status(204).end();
   } catch (e) {
     res.status(500).json({ error: e.message });
   }

@@ -88,6 +88,30 @@
     .donut-modal-body td { padding: .6rem .75rem; border-bottom: 1px solid #f3f4f6; }
     .donut-modal-summary { padding: .75rem 1.5rem; border-top: 1px solid #e5e7eb; font-size: .85rem; font-weight: 600; color: #374151; }
     @media (max-width: 640px) { .donut-modal { width: calc(100% - 2rem); } }
+    .budget-panel { padding: 1.5rem 2rem; }
+    .budget-controls { display: flex; align-items: center; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
+    .budget-add-form { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
+    .budget-add-form select, .budget-add-form input { width: auto; }
+    .budget-add-form button { padding: .5rem 1rem; background: linear-gradient(135deg, #2563eb, #1d4ed8); color: #fff; border: none; border-radius: 6px; font-size: .9rem; cursor: pointer; font-weight: 600; }
+    .budget-add-form button:hover { background: linear-gradient(135deg, #1d4ed8, #1e40af); }
+    .budget-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1rem; }
+    @media (max-width: 640px) { .budget-cards { grid-template-columns: 1fr; } }
+    .budget-card { background: #fff; border-radius: 10px; padding: 1.25rem 1.5rem; box-shadow: 0 2px 8px rgba(0,0,0,.10), 0 1px 2px rgba(0,0,0,.06); position: relative; }
+    .budget-card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: .75rem; }
+    .budget-card-header h3 { font-size: .95rem; font-weight: 700; color: #111827; margin: 0; }
+    .budget-card-delete { background: none; border: none; color: #9ca3af; cursor: pointer; font-size: 1rem; padding: 0 .25rem; }
+    .budget-card-delete:hover { color: #dc2626; }
+    .budget-progress-bar { height: 12px; background: #e5e7eb; border-radius: 6px; overflow: hidden; margin-bottom: .5rem; }
+    .budget-progress-fill { height: 100%; border-radius: 6px; transition: width .3s; }
+    .budget-card-info { display: flex; justify-content: space-between; font-size: .85rem; color: #374151; }
+    .budget-card-limit { cursor: pointer; }
+    .budget-card-limit:hover { text-decoration: underline; }
+    .budget-card-status { font-weight: 600; }
+    .budget-unbudgeted { margin-top: 2rem; }
+    .budget-unbudgeted h3 { font-size: 1rem; font-weight: 700; color: #111827; margin-bottom: .75rem; }
+    .budget-unbudgeted-list { background: #fff; border-radius: 10px; padding: 1rem 1.5rem; box-shadow: 0 2px 8px rgba(0,0,0,.10), 0 1px 2px rgba(0,0,0,.06); }
+    .budget-unbudgeted-item { display: flex; justify-content: space-between; padding: .5rem 0; border-bottom: 1px solid #f3f4f6; font-size: .9rem; }
+    .budget-unbudgeted-item:last-child { border-bottom: none; }
   </style>
 </head>
 <body>
@@ -106,6 +130,7 @@
 <div class="tab-bar">
   <button type="button" class="tab active" id="tab-transakcje">Transakcje</button>
   <button type="button" class="tab" id="tab-wykresy">Wykresy</button>
+  <button type="button" class="tab" id="tab-budzet">Budżet</button>
 </div>
 
 <div class="filter-bar">
@@ -248,6 +273,19 @@
   </div>
 </div>
 
+<div class="budget-panel" id="budget-panel" style="display:none">
+  <div class="budget-controls">
+    <select id="budget-month-select"></select>
+    <div class="budget-add-form">
+      <select id="budget-cat-select"></select>
+      <input type="number" id="budget-limit-input" min="1" step="1" placeholder="Limit (zł)">
+      <button type="button" id="budget-add-btn">Dodaj</button>
+    </div>
+  </div>
+  <div class="budget-cards" id="budget-cards"></div>
+  <div class="budget-unbudgeted" id="budget-unbudgeted"></div>
+</div>
+
 <script>
   fetch('/api/me').then(r => {
     if (!r.ok) { window.location.href = '/login'; return; }
@@ -262,14 +300,17 @@
   async function initApp() {
   let transactions = [];
   let categories = [];
+  let budgets = [];
 
   async function loadData() {
-    const [txnsRes, catsRes] = await Promise.all([
+    const [txnsRes, catsRes, budRes] = await Promise.all([
       fetch('/api/transactions'),
-      fetch('/api/categories')
+      fetch('/api/categories'),
+      fetch('/api/budgets')
     ]);
     transactions = await txnsRes.json();
     categories = await catsRes.json();
+    budgets = await budRes.json();
   }
 
   const form = document.getElementById('txn-form');
@@ -620,27 +661,36 @@
   let donutChart = null, trendChart = null, top10Chart = null;
   let chartFilterFrom = '', chartFilterTo = '';
 
+  let budgetActive = false;
+
+  function setActiveTab(tab) {
+    chartsActive = tab === 'wykresy';
+    budgetActive = tab === 'budzet';
+    document.getElementById('tab-transakcje').classList.toggle('active', tab === 'transakcje');
+    document.getElementById('tab-wykresy').classList.toggle('active', tab === 'wykresy');
+    document.getElementById('tab-budzet').classList.toggle('active', tab === 'budzet');
+    document.querySelector('.filter-bar').style.display = tab === 'transakcje' ? '' : 'none';
+    document.querySelector('.summary').style.display = tab === 'transakcje' ? '' : 'none';
+    document.querySelector('.main').style.display = tab === 'transakcje' ? '' : 'none';
+    document.getElementById('charts-panel').style.display = tab === 'wykresy' ? 'block' : 'none';
+    document.getElementById('budget-panel').style.display = tab === 'budzet' ? 'block' : 'none';
+  }
+
   document.getElementById('tab-transakcje').addEventListener('click', () => {
-    chartsActive = false;
-    document.getElementById('tab-transakcje').classList.add('active');
-    document.getElementById('tab-wykresy').classList.remove('active');
-    document.querySelector('.filter-bar').style.display = '';
-    document.querySelector('.summary').style.display = '';
-    document.querySelector('.main').style.display = '';
-    document.getElementById('charts-panel').style.display = 'none';
+    setActiveTab('transakcje');
     render();
   });
 
   document.getElementById('tab-wykresy').addEventListener('click', () => {
-    chartsActive = true;
-    document.getElementById('tab-wykresy').classList.add('active');
-    document.getElementById('tab-transakcje').classList.remove('active');
-    document.querySelector('.filter-bar').style.display = 'none';
-    document.querySelector('.summary').style.display = 'none';
-    document.querySelector('.main').style.display = 'none';
-    document.getElementById('charts-panel').style.display = 'block';
+    setActiveTab('wykresy');
     buildChartsFilter();
     renderCharts();
+  });
+
+  document.getElementById('tab-budzet').addEventListener('click', () => {
+    setActiveTab('budzet');
+    buildBudgetMonthSelect();
+    renderBudget();
   });
 
   function buildChartsFilter() {
@@ -887,6 +937,194 @@
 
   document.getElementById('top10-mode').addEventListener('change', renderTop10);
 
+  // --- Budget ---
+  let budgetMonth = '';
+
+  function buildBudgetMonthSelect() {
+    const sel = document.getElementById('budget-month-select');
+    const prev = sel.value;
+    const months = new Set();
+    transactions.forEach(t => months.add(t.date.slice(0, 7)));
+    const now = new Date();
+    months.add(toYMD(now).slice(0, 7));
+    const sorted = [...months].sort().reverse();
+    sel.innerHTML = '';
+    sorted.forEach(ym => {
+      const [y, m] = ym.split('-');
+      const opt = document.createElement('option');
+      opt.value = ym;
+      opt.textContent = PL_MONTHS_FULL[parseInt(m, 10) - 1] + ' ' + y;
+      sel.appendChild(opt);
+    });
+    if (prev && [...sel.options].some(o => o.value === prev)) {
+      sel.value = prev;
+    }
+    budgetMonth = sel.value;
+  }
+
+  document.getElementById('budget-month-select').addEventListener('change', e => {
+    budgetMonth = e.target.value;
+    renderBudget();
+  });
+
+  function buildBudgetCatSelect() {
+    const sel = document.getElementById('budget-cat-select');
+    sel.innerHTML = '';
+    const budgeted = new Set(budgets.map(b => b.category));
+    categories.filter(c => !budgeted.has(c)).forEach(c => {
+      const opt = document.createElement('option');
+      opt.value = c;
+      opt.textContent = c;
+      sel.appendChild(opt);
+    });
+  }
+
+  document.getElementById('budget-add-btn').addEventListener('click', async () => {
+    const cat = document.getElementById('budget-cat-select').value;
+    const limitVal = parseInt(document.getElementById('budget-limit-input').value, 10);
+    if (!cat || !limitVal || limitVal < 1) return;
+    const res = await fetch('/api/budgets', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ category: cat, limitCents: limitVal * 100 })
+    });
+    const saved = await res.json();
+    const idx = budgets.findIndex(b => b.category === saved.category);
+    if (idx >= 0) budgets[idx] = saved; else budgets.push(saved);
+    document.getElementById('budget-limit-input').value = '';
+    renderBudget();
+  });
+
+  function getSpentByCategory(month) {
+    const spent = {};
+    transactions.forEach(t => {
+      if (t.type === 'expense' && t.date.startsWith(month)) {
+        const cat = t.category || 'Inne';
+        spent[cat] = (spent[cat] || 0) + t.amountCents;
+      }
+    });
+    return spent;
+  }
+
+  function renderBudget() {
+    const container = document.getElementById('budget-cards');
+    container.innerHTML = '';
+    buildBudgetCatSelect();
+    const spent = getSpentByCategory(budgetMonth);
+
+    budgets.forEach(b => {
+      const card = document.createElement('div');
+      card.className = 'budget-card';
+      const spentCents = spent[b.category] || 0;
+      const pct = b.limitCents > 0 ? (spentCents / b.limitCents) * 100 : 0;
+      const color = pct >= 100 ? '#dc2626' : pct >= 75 ? '#f59e0b' : '#16a34a';
+      const over = spentCents >= b.limitCents;
+
+      const header = document.createElement('div');
+      header.className = 'budget-card-header';
+      const h3 = document.createElement('h3');
+      h3.textContent = b.category;
+      const delBtn = document.createElement('button');
+      delBtn.className = 'budget-card-delete';
+      delBtn.textContent = '✕';
+      delBtn.addEventListener('click', async () => {
+        await fetch('/api/budgets/' + encodeURIComponent(b.category), { method: 'DELETE' });
+        budgets = budgets.filter(x => x.category !== b.category);
+        renderBudget();
+      });
+      header.appendChild(h3);
+      header.appendChild(delBtn);
+
+      const bar = document.createElement('div');
+      bar.className = 'budget-progress-bar';
+      const fill = document.createElement('div');
+      fill.className = 'budget-progress-fill';
+      fill.style.width = Math.min(pct, 100) + '%';
+      fill.style.background = color;
+      bar.appendChild(fill);
+
+      const info = document.createElement('div');
+      info.className = 'budget-card-info';
+      const spentLabel = document.createElement('span');
+      spentLabel.textContent = fmt(spentCents / 100) + ' / ';
+      const limitSpan = document.createElement('span');
+      limitSpan.className = 'budget-card-limit';
+      limitSpan.textContent = fmt(b.limitCents / 100);
+      limitSpan.addEventListener('click', () => {
+        if (limitSpan.querySelector('input')) return;
+        const inp = document.createElement('input');
+        inp.type = 'number';
+        inp.min = '1';
+        inp.step = '1';
+        inp.value = Math.round(b.limitCents / 100);
+        inp.style.width = '80px';
+        limitSpan.textContent = '';
+        limitSpan.appendChild(inp);
+        inp.focus();
+        const save = async () => {
+          const newVal = parseInt(inp.value, 10);
+          if (newVal && newVal >= 1 && newVal * 100 !== b.limitCents) {
+            const res = await fetch('/api/budgets', {
+              method: 'POST',
+              headers: {'Content-Type': 'application/json'},
+              body: JSON.stringify({ category: b.category, limitCents: newVal * 100 })
+            });
+            const saved = await res.json();
+            b.limitCents = saved.limitCents;
+          }
+          renderBudget();
+        };
+        inp.addEventListener('blur', save);
+        inp.addEventListener('keydown', e => { if (e.key === 'Enter') inp.blur(); });
+      });
+      spentLabel.appendChild(limitSpan);
+
+      const status = document.createElement('span');
+      status.className = 'budget-card-status';
+      if (over) {
+        status.style.color = '#dc2626';
+        status.textContent = 'Przekroczono o ' + fmt((spentCents - b.limitCents) / 100);
+      } else {
+        status.style.color = '#16a34a';
+        status.textContent = 'Pozostało: ' + fmt((b.limitCents - spentCents) / 100);
+      }
+      info.appendChild(spentLabel);
+      info.appendChild(status);
+
+      card.appendChild(header);
+      card.appendChild(bar);
+      card.appendChild(info);
+      container.appendChild(card);
+    });
+
+    const unbudgetedDiv = document.getElementById('budget-unbudgeted');
+    unbudgetedDiv.innerHTML = '';
+    const budgetedCats = new Set(budgets.map(b => b.category));
+    const unbudgeted = Object.entries(spent)
+      .filter(([cat]) => !budgetedCats.has(cat))
+      .sort((a, b) => b[1] - a[1]);
+
+    if (unbudgeted.length > 0) {
+      const h3 = document.createElement('h3');
+      h3.textContent = 'Pozostałe wydatki';
+      unbudgetedDiv.appendChild(h3);
+      const listDiv = document.createElement('div');
+      listDiv.className = 'budget-unbudgeted-list';
+      unbudgeted.forEach(([cat, cents]) => {
+        const item = document.createElement('div');
+        item.className = 'budget-unbudgeted-item';
+        const nameSpan = document.createElement('span');
+        nameSpan.textContent = cat;
+        const amtSpan = document.createElement('span');
+        amtSpan.textContent = fmt(cents / 100);
+        item.appendChild(nameSpan);
+        item.appendChild(amtSpan);
+        listDiv.appendChild(item);
+      });
+      unbudgetedDiv.appendChild(listDiv);
+    }
+  }
+
   document.getElementById('date').valueAsDate = new Date();
   await loadData();
   buildCategorySelect();
@@ -897,7 +1135,10 @@
     await loadData();
     buildCategorySelect();
     buildFilterMonthSelect();
-    if (chartsActive) {
+    if (budgetActive) {
+      buildBudgetMonthSelect();
+      renderBudget();
+    } else if (chartsActive) {
       buildChartsFilter();
       renderCharts();
     } else {
