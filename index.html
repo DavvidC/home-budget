@@ -103,6 +103,8 @@
     <button type="button" class="preset-chip" data-preset="custom">Niestandardowy</button>
   </div>
   <div class="custom-date-row" id="filter-custom-row">
+    <label style="margin:0">Miesiąc:</label>
+    <select id="filter-month-select" style="width:auto"></select>
     <label style="margin:0">Od:</label>
     <input type="date" id="filter-from" style="width:auto">
     <label style="margin:0">Do:</label>
@@ -345,12 +347,48 @@
     setPreset(btn.dataset.preset);
   });
 
+  const PL_MONTHS = ['Styczeń','Luty','Marzec','Kwiecień','Maj','Czerwiec','Lipiec','Sierpień','Wrzesień','Październik','Listopad','Grudzień'];
+
+  function buildFilterMonthSelect() {
+    const sel = document.getElementById('filter-month-select');
+    const prev = sel.value;
+    const months = new Set();
+    transactions.forEach(t => months.add(t.date.slice(0, 7)));
+    const now = new Date();
+    months.add(toYMD(now).slice(0, 7));
+    const sorted = [...months].sort().reverse();
+    sel.innerHTML = '<option value="">— wybierz —</option>';
+    sorted.forEach(ym => {
+      const [y, m] = ym.split('-');
+      const opt = document.createElement('option');
+      opt.value = ym;
+      opt.textContent = PL_MONTHS[parseInt(m, 10) - 1] + ' ' + y;
+      sel.appendChild(opt);
+    });
+    if (prev && [...sel.options].some(o => o.value === prev)) sel.value = prev;
+  }
+
+  document.getElementById('filter-month-select').addEventListener('change', e => {
+    const val = e.target.value;
+    if (!val) return;
+    const [y, m] = val.split('-');
+    const fromStr = val + '-01';
+    const toStr = toYMD(new Date(parseInt(y), parseInt(m), 0));
+    document.getElementById('filter-from').value = fromStr;
+    document.getElementById('filter-to').value = toStr;
+    filterFrom = fromStr;
+    filterTo = toStr;
+    render();
+  });
+
   document.getElementById('filter-from').addEventListener('change', () => {
+    document.getElementById('filter-month-select').value = '';
     filterFrom = document.getElementById('filter-from').value;
     render();
   });
 
   document.getElementById('filter-to').addEventListener('change', () => {
+    document.getElementById('filter-month-select').value = '';
     filterTo = document.getElementById('filter-to').value;
     render();
   });
@@ -726,11 +764,13 @@
   document.getElementById('date').valueAsDate = new Date();
   await loadData();
   buildCategorySelect();
+  buildFilterMonthSelect();
   setPreset('month');
 
   setInterval(async () => {
     await loadData();
     buildCategorySelect();
+    buildFilterMonthSelect();
     if (chartsActive) {
       buildChartsFilter();
       renderCharts();
