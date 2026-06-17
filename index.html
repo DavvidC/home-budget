@@ -445,6 +445,33 @@
       const tdComment = document.createElement('td');
       const commentText = t.comment || '';
       tdComment.textContent = commentText.length > 40 ? commentText.slice(0, 40) + '…' : commentText;
+      tdComment.style.cursor = 'pointer';
+      tdComment.title = 'Kliknij aby edytować';
+      tdComment.addEventListener('click', () => {
+        if (tdComment.querySelector('input')) return;
+        const inp = document.createElement('input');
+        inp.type = 'text';
+        inp.value = t.comment || '';
+        inp.style.width = '100%';
+        tdComment.textContent = '';
+        tdComment.appendChild(inp);
+        inp.focus();
+        const save = async () => {
+          const newVal = inp.value.trim();
+          if (newVal !== (t.comment || '')) {
+            await fetch('/api/transactions/' + t.id, {
+              method: 'PATCH',
+              headers: {'Content-Type': 'application/json'},
+              body: JSON.stringify({ comment: newVal, desc: newVal })
+            });
+            t.comment = newVal;
+            t.desc = newVal;
+          }
+          tdComment.textContent = newVal.length > 40 ? newVal.slice(0, 40) + '…' : newVal;
+        };
+        inp.addEventListener('blur', save);
+        inp.addEventListener('keydown', e => { if (e.key === 'Enter') inp.blur(); });
+      });
       const tdCat = document.createElement('td');
       tdCat.textContent = t.category || '—';
       tdCat.style.cursor = 'pointer';
