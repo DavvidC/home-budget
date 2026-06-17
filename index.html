@@ -505,6 +505,7 @@
     document.querySelector('.summary').style.display = '';
     document.querySelector('.main').style.display = '';
     document.getElementById('charts-panel').style.display = 'none';
+    render();
   });
 
   document.getElementById('tab-wykresy').addEventListener('click', () => {
@@ -568,17 +569,20 @@
 
   document.getElementById('charts-month-select').addEventListener('change', e => {
     setChartDateRange(e.target.value);
-    renderCharts();
+    renderDonut();
+    renderTop10();
   });
 
   document.getElementById('charts-from').addEventListener('change', () => {
     chartFilterFrom = document.getElementById('charts-from').value;
-    renderCharts();
+    renderDonut();
+    renderTop10();
   });
 
   document.getElementById('charts-to').addEventListener('change', () => {
     chartFilterTo = document.getElementById('charts-to').value;
-    renderCharts();
+    renderDonut();
+    renderTop10();
   });
 
   const centerTextPlugin = {
