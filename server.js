@@ -186,16 +186,21 @@ app.post('/api/import', requireAuth, async (req, res) => {
       const date = `${year}-${month}-${day}`;
 
       let amountStr, odbiorca, comment, refNum, category;
+      let zrodlowy, docelowy;
       if (isCSV) {
-        // CSV: cols[2]=odbiorca, cols[3]=address(skip), cols[6]=comment, cols[7]=amount, cols[9]=refNum, no category
-        odbiorca = (cols[2] || '').trim();
-        comment  = (cols[6] || '').trim();
-        amountStr = (cols[7] || '').trim().replace(/\s/g, '').replace(',', '.');
-        refNum   = (cols[9] || '').trim().replace(/^'/, '');
-        category = 'Inne';
-      } else {
-        // TXT: cols[2]=odbiorca, cols[5]=comment, cols[6]=amount, cols[8]=refNum, cols[10]=category
+        // CSV: cols[2]=odbiorca, cols[3]=address(skip), cols[4]=zrodlowy, cols[5]=docelowy, cols[6]=comment, cols[7]=amount, cols[9]=refNum
         odbiorca  = (cols[2] || '').trim();
+        zrodlowy  = (cols[4] || '').trim().replace(/^'/, '');
+        docelowy  = (cols[5] || '').trim().replace(/^'/, '');
+        comment   = (cols[6] || '').trim();
+        amountStr = (cols[7] || '').trim().replace(/\s/g, '').replace(',', '.');
+        refNum    = (cols[9] || '').trim().replace(/^'/, '');
+        category  = 'Inne';
+      } else {
+        // TXT: cols[2]=odbiorca, cols[3]=zrodlowy, cols[4]=docelowy, cols[5]=comment, cols[6]=amount, cols[8]=refNum, cols[10]=category
+        odbiorca  = (cols[2] || '').trim();
+        zrodlowy  = (cols[3] || '').trim();
+        docelowy  = (cols[4] || '').trim();
         comment   = (cols[5] || '').trim();
         amountStr = (cols[6] || '').trim().replace(/\s/g, '').replace(',', '.');
         refNum    = (cols[8] || '').trim();
@@ -207,7 +212,7 @@ app.post('/api/import', requireAuth, async (req, res) => {
       const amountCents = Math.round(Math.abs(amountFloat) * 100);
       const type = amountFloat >= 0 ? 'income' : 'expense';
       const id = refNum || crypto.createHash('sha256').update(`${date}|${amountStr}`).digest('hex').slice(0, 36);
-      const data = { id, date, amountCents, type, category, desc: comment, odbiorca, comment };
+      const data = { id, date, amountCents, type, category, desc: comment, odbiorca, comment, zrodlowy, docelowy };
       const result = await pool.query(
         'INSERT INTO transactions(id, data, odbiorca, comment) VALUES($1, $2, $3, $4) ON CONFLICT (id) DO NOTHING',
         [id, data, odbiorca, comment]
