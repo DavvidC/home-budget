@@ -312,6 +312,8 @@
   });
 
   function render() {
+    document.getElementById('bulk-del-btn').classList.remove('visible');
+    document.getElementById('select-all').checked = false;
     list.innerHTML = '';
     const filtered = transactions.filter(t => t.date >= filterFrom && t.date <= filterTo);
     const sorted = [...filtered].sort((a, b) => b.date.localeCompare(a.date));
