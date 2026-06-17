@@ -20,6 +20,7 @@ async function initDB() {
     );
     ALTER TABLE transactions ADD COLUMN IF NOT EXISTS odbiorca TEXT;
     ALTER TABLE transactions ADD COLUMN IF NOT EXISTS comment TEXT;
+    INSERT INTO categories(name) VALUES ('Wypłata'),('Jedzenie'),('Prąd'),('Leasing'),('Paliwo'),('Inne') ON CONFLICT DO NOTHING;
   `);
   console.log('DB ready');
 }
@@ -236,6 +237,9 @@ app.post('/api/import', requireAuth, async (req, res) => {
       const amountCents = Math.round(Math.abs(amountFloat) * 100);
       const type = amountFloat >= 0 ? 'income' : 'expense';
       const id = refNum || crypto.createHash('sha256').update(`${date}|${amountStr}`).digest('hex').slice(0, 36);
+      if (!isCSV && category) {
+        await pool.query('INSERT INTO categories(name) VALUES($1) ON CONFLICT DO NOTHING', [category]);
+      }
       const data = { id, date, amountCents, type, category, desc: comment, odbiorca, comment, zrodlowy, docelowy };
       const result = await pool.query(
         'INSERT INTO transactions(id, data, odbiorca, comment) VALUES($1, $2, $3, $4) ON CONFLICT (id) DO NOTHING',

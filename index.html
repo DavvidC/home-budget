@@ -231,10 +231,8 @@
   }).catch(() => { window.location.href = '/login'; });
 
   async function initApp() {
-  const BUILT_IN_CATS = ['Wypłata', 'Jedzenie', 'Prąd', 'Leasing', 'Paliwo', 'Inne'];
-
   let transactions = [];
-  let customCats = [];
+  let categories = [];
 
   async function loadData() {
     const [txnsRes, catsRes] = await Promise.all([
@@ -242,8 +240,7 @@
       fetch('/api/categories')
     ]);
     transactions = await txnsRes.json();
-    const cats = await catsRes.json();
-    customCats = cats.map(c => c.name);
+    categories = await catsRes.json();
   }
 
   const form = document.getElementById('txn-form');
@@ -255,7 +252,7 @@
   function buildCategorySelect() {
     const prev = catSelect.value;
     catSelect.innerHTML = '';
-    [...BUILT_IN_CATS, ...customCats].forEach(c => {
+    categories.forEach(c => {
       const opt = document.createElement('option');
       opt.value = c;
       opt.textContent = c;
@@ -271,7 +268,7 @@
   document.getElementById('add-cat-btn').addEventListener('click', async () => {
     const name = newCatInput.value.trim();
     if (!name) return;
-    if ([...BUILT_IN_CATS, ...customCats].includes(name)) {
+    if (categories.includes(name)) {
       catSelect.value = name;
       newCatInput.value = '';
       return;
@@ -281,7 +278,8 @@
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({name})
     });
-    customCats.push(name);
+    categories.push(name);
+    categories.sort((a, b) => a.localeCompare(b));
     buildCategorySelect();
     catSelect.value = name;
     newCatInput.value = '';
@@ -426,7 +424,7 @@
         if (tdCat.querySelector('select')) return;
         const sel = document.createElement('select');
         sel.style.width = '100%';
-        [...BUILT_IN_CATS, ...customCats].forEach(c => {
+        categories.forEach(c => {
           const opt = document.createElement('option');
           opt.value = c; opt.textContent = c;
           if (c === t.category) opt.selected = true;
