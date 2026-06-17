@@ -381,6 +381,36 @@
       tdComment.textContent = commentText.length > 40 ? commentText.slice(0, 40) + '…' : commentText;
       const tdCat = document.createElement('td');
       tdCat.textContent = t.category || '—';
+      tdCat.style.cursor = 'pointer';
+      tdCat.title = 'Kliknij aby zmienić';
+      tdCat.addEventListener('click', () => {
+        if (tdCat.querySelector('select')) return;
+        const sel = document.createElement('select');
+        sel.style.width = '100%';
+        [...BUILT_IN_CATS, ...customCats].forEach(c => {
+          const opt = document.createElement('option');
+          opt.value = c; opt.textContent = c;
+          if (c === t.category) opt.selected = true;
+          sel.appendChild(opt);
+        });
+        tdCat.textContent = '';
+        tdCat.appendChild(sel);
+        sel.focus();
+        const save = async () => {
+          const newCat = sel.value;
+          if (newCat !== t.category) {
+            await fetch('/api/transactions/' + t.id, {
+              method: 'PATCH',
+              headers: {'Content-Type': 'application/json'},
+              body: JSON.stringify({ category: newCat })
+            });
+            t.category = newCat;
+          }
+          tdCat.textContent = newCat;
+        };
+        sel.addEventListener('change', save);
+        sel.addEventListener('blur', save);
+      });
       const tdType = document.createElement('td');
       const badge = document.createElement('span');
       badge.className = 'badge ' + t.type;

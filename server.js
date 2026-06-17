@@ -137,6 +137,19 @@ app.post('/api/transactions', requireAuth, async (req, res) => {
   }
 });
 
+app.patch('/api/transactions/:id', requireAuth, async (req, res) => {
+  try {
+    const updates = req.body;
+    await pool.query(
+      'UPDATE transactions SET data = data || $2::jsonb WHERE id = $1',
+      [req.params.id, JSON.stringify(updates)]
+    );
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 app.delete('/api/transactions', requireAuth, async (req, res) => {
   const { ids } = req.body || {};
   if (!Array.isArray(ids) || ids.length === 0) return res.status(400).json({ error: 'ids required' });
