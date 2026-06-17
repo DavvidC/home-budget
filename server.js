@@ -175,16 +175,17 @@ app.post('/api/import', requireAuth, async (req, res) => {
       if (!/^\d{2}\.\d{2}\.\d{4}$/.test(dateRaw)) continue;
       const [day, month, year] = dateRaw.split('.');
       const date = `${year}-${month}-${day}`;
-      const amountStr = cols[3].trim().replace(/\s/g, '').replace(',', '.');
+      const amountStr = cols[6].trim().replace(/\s/g, '').replace(',', '.');
       const amountFloat = parseFloat(amountStr);
       if (isNaN(amountFloat)) continue;
       const amountCents = Math.round(Math.abs(amountFloat) * 100);
       const type = amountFloat >= 0 ? 'income' : 'expense';
-      const comment = (cols[6] || '').trim();
-      const odbiorca = (cols[7] || '').trim();
-      const refNum = (cols[9] || '').trim();
+      const odbiorca = (cols[2] || '').trim();
+      const comment = (cols[5] || '').trim();
+      const refNum = (cols[8] || '').trim();
+      const category = (cols[10] || '').trim() || 'Inne';
       const id = refNum || crypto.createHash('sha256').update(`${date}|${amountFloat}`).digest('hex').slice(0, 36);
-      const data = { id, date, amountCents, type, category: 'Inne', desc: comment, odbiorca, comment };
+      const data = { id, date, amountCents, type, category, desc: comment, odbiorca, comment };
       const result = await pool.query(
         'INSERT INTO transactions(id, data, odbiorca, comment) VALUES($1, $2, $3, $4) ON CONFLICT (id) DO NOTHING',
         [id, data, odbiorca, comment]
