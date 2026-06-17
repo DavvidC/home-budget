@@ -6,17 +6,18 @@
   <title>Domowy Budżet</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
   <style>
+    html { scroll-behavior: smooth; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: system-ui, sans-serif; background: #f0f2f5; color: #222; }
     header { background: linear-gradient(135deg, #1e40af 0%, #2563eb 60%, #3b82f6 100%); color: #fff; padding: 1.25rem 2rem; box-shadow: 0 2px 8px rgba(37,99,235,.35); }
-    header h1 { font-size: 1.5rem; font-weight: 700; letter-spacing: .02em; }
+    header h1 { font-size: 1.65rem; font-weight: 700; letter-spacing: .02em; border-bottom: 2px solid rgba(255,255,255,.3); display: inline-block; padding-bottom: .25rem; }
     .tab-bar { display: flex; background: #fff; border-bottom: 1px solid #e5e7eb; padding: 0 2rem; }
-    .tab { background: none; border: none; padding: .75rem 1.5rem; font-size: .95rem; font-weight: 600; color: #6b7280; cursor: pointer; border-bottom: 2px solid transparent; }
+    .tab { background: none; border: none; padding: .75rem 1.5rem; font-size: .95rem; font-weight: 600; color: #6b7280; cursor: pointer; border-bottom: 2px solid transparent; transition: color .15s, border-bottom-color .15s; }
     .tab.active { color: #2563eb; border-bottom-color: #2563eb; }
     .tab:hover { color: #2563eb; }
     .filter-bar { background: #fff; padding: .75rem 2rem; border-bottom: 1px solid #e5e7eb; display: flex; flex-direction: column; gap: .5rem; }
     .preset-chips { display: flex; gap: .35rem; flex-wrap: wrap; }
-    .preset-chip { padding: .35rem .65rem; border: 1px solid #e5e7eb; border-radius: 6px; font-size: .78rem; cursor: pointer; background: #f9fafb; color: #374151; white-space: nowrap; }
+    .preset-chip { padding: .35rem .65rem; border: 1px solid #e5e7eb; border-radius: 6px; font-size: .78rem; cursor: pointer; background: #f9fafb; color: #374151; white-space: nowrap; transition: all .15s; }
     .preset-chip.active { background: #2563eb; color: #fff; border-color: #2563eb; font-weight: 600; }
     .custom-date-row { display: none; align-items: center; gap: .5rem; flex-wrap: wrap; }
     .summary { display: flex; gap: 1rem; padding: 1.5rem 2rem; flex-wrap: wrap; }
@@ -33,7 +34,7 @@
     h2 { font-size: 1rem; font-weight: 700; margin-bottom: 1rem; color: #111827; letter-spacing: .01em; }
     .form-group { margin-bottom: .75rem; }
     label { display: block; font-size: .8rem; color: #555; margin-bottom: .25rem; font-weight: 500; }
-    input, select { width: 100%; padding: .5rem .75rem; border: 1px solid #d1d5db; border-radius: 6px; font-size: .9rem; }
+    input, select { width: 100%; padding: .5rem .75rem; border: 1px solid #d1d5db; border-radius: 6px; font-size: .9rem; transition: all .15s ease; }
     input:focus, select:focus { outline: 2px solid #2563eb; border-color: transparent; }
     .radio-group { display: flex; gap: .75rem; margin-top: .25rem; }
     .radio-group label { display: flex; align-items: center; gap: .35rem; font-size: .9rem; color: #222; cursor: pointer; }
@@ -42,8 +43,8 @@
     .add-cat-row input { flex: 1; width: auto; }
     .add-cat-btn { flex-shrink: 0; padding: .5rem .75rem; background: #f3f4f6; border: 1px solid #d1d5db; border-radius: 6px; cursor: pointer; font-size: 1rem; line-height: 1; }
     .add-cat-btn:hover { background: #e5e7eb; }
-    button[type=submit] { width: 100%; background: linear-gradient(135deg, #2563eb, #1d4ed8); color: #fff; border: none; padding: .65rem; border-radius: 6px; font-size: .95rem; cursor: pointer; margin-top: .5rem; font-weight: 600; box-shadow: 0 2px 6px rgba(37,99,235,.35); }
-    button[type=submit]:hover { background: linear-gradient(135deg, #1d4ed8, #1e40af); }
+    button[type=submit] { width: 100%; background: linear-gradient(135deg, #2563eb, #1d4ed8); color: #fff; border: none; padding: .65rem; border-radius: 6px; font-size: .95rem; cursor: pointer; margin-top: .5rem; font-weight: 600; box-shadow: 0 2px 6px rgba(37,99,235,.35); transition: all .2s ease; }
+    button[type=submit]:hover { background: linear-gradient(135deg, #1d4ed8, #1e40af); transform: translateY(-1px); }
     table { width: 100%; border-collapse: collapse; font-size: .9rem; }
     th { text-align: left; padding: .5rem .75rem; font-size: .75rem; text-transform: uppercase; letter-spacing: .05em; color: #6b7280; border-bottom: 1px solid #e5e7eb; font-weight: 600; }
     td { padding: .6rem .75rem; border-bottom: 1px solid #f3f4f6; }
@@ -112,6 +113,20 @@
     .budget-unbudgeted-list { background: #fff; border-radius: 10px; padding: 1rem 1.5rem; box-shadow: 0 2px 8px rgba(0,0,0,.10), 0 1px 2px rgba(0,0,0,.06); }
     .budget-unbudgeted-item { display: flex; justify-content: space-between; padding: .5rem 0; border-bottom: 1px solid #f3f4f6; font-size: .9rem; }
     .budget-unbudgeted-item:last-child { border-bottom: none; }
+    button { transition: all .15s ease; }
+    #txn-list tr:nth-child(even) { background: #f9fafb; }
+    #txn-list tr { transition: background .15s; }
+    #txn-list tr:hover { background: #eef2ff; }
+    .amt-right { text-align: right; }
+    .editable-cell { border-bottom: 1px dotted #d1d5db; cursor: pointer; }
+    .editable-cell:hover { border-bottom-style: solid; border-bottom-color: #2563eb; }
+    .card.income { border-left: 4px solid #16a34a; }
+    .card.expenses { border-left: 4px solid #dc2626; }
+    .card.balance { border-left: 4px solid #2563eb; }
+    .budget-card, .chart-card { transition: box-shadow .2s; }
+    .budget-card:hover, .chart-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,.15), 0 2px 4px rgba(0,0,0,.08); }
+    .table-scroll { overflow-x: auto; }
+    .budget-pct { font-size: .8rem; font-weight: 600; margin-left: .5rem; }
   </style>
 </head>
 <body>
@@ -211,6 +226,7 @@
         <button type="button" class="import-btn" id="import-btn">Importuj wyciag</button>
       </div>
     </div>
+    <div class="table-scroll">
     <table>
       <thead>
         <tr>
@@ -221,12 +237,13 @@
           <th>Opis</th>
           <th>Kategoria</th>
           <th>Typ</th>
-          <th>Kwota</th>
+          <th class="amt-right">Kwota</th>
           <th></th>
         </tr>
       </thead>
       <tbody id="txn-list"></tbody>
     </table>
+    </div>
     <div class="empty" id="empty-msg">Brak transakcji.</div>
   </div>
 </div>
@@ -478,15 +495,15 @@
       cb.dataset.id = t.id;
       tdCb.appendChild(cb);
       const tdDate = document.createElement('td');
-      tdDate.textContent = t.date;
+      tdDate.textContent = t.date.split('-').reverse().join('.');
       const tdDesc = document.createElement('td');
       tdDesc.textContent = t.desc;
       const tdOdbiorca = document.createElement('td');
       tdOdbiorca.textContent = t.odbiorca || '';
       const tdComment = document.createElement('td');
+      tdComment.className = 'editable-cell';
       const commentText = t.comment || '';
       tdComment.textContent = commentText.length > 40 ? commentText.slice(0, 40) + '…' : commentText;
-      tdComment.style.cursor = 'pointer';
       tdComment.title = 'Kliknij aby edytować';
       tdComment.addEventListener('click', () => {
         if (tdComment.querySelector('input')) return;
@@ -514,8 +531,8 @@
         inp.addEventListener('keydown', e => { if (e.key === 'Enter') inp.blur(); });
       });
       const tdCat = document.createElement('td');
+      tdCat.className = 'editable-cell';
       tdCat.textContent = t.category || '—';
-      tdCat.style.cursor = 'pointer';
       tdCat.title = 'Kliknij aby zmienić';
       tdCat.addEventListener('click', () => {
         if (tdCat.querySelector('select')) return;
@@ -551,7 +568,10 @@
       badge.textContent = t.type === 'income' ? 'przychód' : 'wydatek';
       tdType.appendChild(badge);
       const tdAmt = document.createElement('td');
+      tdAmt.className = 'amt-right';
       tdAmt.textContent = fmt(t.amountCents / 100);
+      tdAmt.style.color = t.type === 'income' ? '#16a34a' : '#dc2626';
+      tdAmt.style.fontWeight = '600';
       const tdDel = document.createElement('td');
       const delBtn = document.createElement('button');
       delBtn.className = 'del-btn';
@@ -1035,13 +1055,25 @@
       header.appendChild(h3);
       header.appendChild(delBtn);
 
+      const barRow = document.createElement('div');
+      barRow.style.display = 'flex';
+      barRow.style.alignItems = 'center';
+      barRow.style.marginBottom = '.5rem';
       const bar = document.createElement('div');
       bar.className = 'budget-progress-bar';
+      bar.style.flex = '1';
+      bar.style.marginBottom = '0';
       const fill = document.createElement('div');
       fill.className = 'budget-progress-fill';
       fill.style.width = Math.min(pct, 100) + '%';
       fill.style.background = color;
       bar.appendChild(fill);
+      const pctLabel = document.createElement('span');
+      pctLabel.className = 'budget-pct';
+      pctLabel.style.color = color;
+      pctLabel.textContent = Math.round(pct) + '%';
+      barRow.appendChild(bar);
+      barRow.appendChild(pctLabel);
 
       const info = document.createElement('div');
       info.className = 'budget-card-info';
@@ -1092,7 +1124,7 @@
       info.appendChild(status);
 
       card.appendChild(header);
-      card.appendChild(bar);
+      card.appendChild(barRow);
       card.appendChild(info);
       container.appendChild(card);
     });
