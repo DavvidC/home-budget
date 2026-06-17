@@ -167,24 +167,46 @@ app.post('/api/categories', requireAuth, async (req, res) => {
 app.post('/api/import', requireAuth, async (req, res) => {
   try {
     const lines = (req.body || '').split(/\r?\n/);
+
+    // Auto-detect: CSV uses semicolons, TXT uses tabs
+    let sep = '\t';
+    for (const line of lines) {
+      if (line.split(';').length >= 10) { sep = ';'; break; }
+      if (line.split('\t').length >= 10) { sep = '\t'; break; }
+    }
+    const isCSV = sep === ';';
+
     let imported = 0, skipped = 0;
     for (const line of lines) {
-      const cols = line.split('\t');
+      const cols = line.split(sep);
       if (cols.length < 10) continue;
       const dateRaw = cols[0].trim();
       if (!/^\d{2}\.\d{2}\.\d{4}$/.test(dateRaw)) continue;
       const [day, month, year] = dateRaw.split('.');
       const date = `${year}-${month}-${day}`;
-      const amountStr = cols[6].trim().replace(/\s/g, '').replace(',', '.');
+
+      let amountStr, odbiorca, comment, refNum, category;
+      if (isCSV) {
+        // CSV: cols[2]=odbiorca, cols[3]=address(skip), cols[6]=comment, cols[7]=amount, cols[9]=refNum, no category
+        odbiorca = (cols[2] || '').trim();
+        comment  = (cols[6] || '').trim();
+        amountStr = (cols[7] || '').trim().replace(/\s/g, '').replace(',', '.');
+        refNum   = (cols[9] || '').trim().replace(/^'/, '');
+        category = 'Inne';
+      } else {
+        // TXT: cols[2]=odbiorca, cols[5]=comment, cols[6]=amount, cols[8]=refNum, cols[10]=category
+        odbiorca  = (cols[2] || '').trim();
+        comment   = (cols[5] || '').trim();
+        amountStr = (cols[6] || '').trim().replace(/\s/g, '').replace(',', '.');
+        refNum    = (cols[8] || '').trim();
+        category  = (cols[10] || '').trim() || 'Inne';
+      }
+
       const amountFloat = parseFloat(amountStr);
       if (isNaN(amountFloat)) continue;
       const amountCents = Math.round(Math.abs(amountFloat) * 100);
       const type = amountFloat >= 0 ? 'income' : 'expense';
-      const odbiorca = (cols[2] || '').trim();
-      const comment = (cols[5] || '').trim();
-      const refNum = (cols[8] || '').trim();
-      const category = (cols[10] || '').trim() || 'Inne';
-      const id = refNum || crypto.createHash('sha256').update(`${date}|${amountFloat}`).digest('hex').slice(0, 36);
+      const id = refNum || crypto.createHash('sha256').update(`${date}|${amountStr}`).digest('hex').slice(0, 36);
       const data = { id, date, amountCents, type, category, desc: comment, odbiorca, comment };
       const result = await pool.query(
         'INSERT INTO transactions(id, data, odbiorca, comment) VALUES($1, $2, $3, $4) ON CONFLICT (id) DO NOTHING',
