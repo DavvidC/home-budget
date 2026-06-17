@@ -137,6 +137,17 @@ app.post('/api/transactions', requireAuth, async (req, res) => {
   }
 });
 
+app.delete('/api/transactions', requireAuth, async (req, res) => {
+  const { ids } = req.body || {};
+  if (!Array.isArray(ids) || ids.length === 0) return res.status(400).json({ error: 'ids required' });
+  try {
+    const result = await pool.query('DELETE FROM transactions WHERE id = ANY($1)', [ids]);
+    res.json({ deleted: result.rowCount });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 app.delete('/api/transactions/:id', requireAuth, async (req, res) => {
   try {
     await pool.query('DELETE FROM transactions WHERE id = $1', [req.params.id]);

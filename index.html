@@ -57,6 +57,10 @@
     .import-btn { background: #f3f4f6; border: 1px solid #d1d5db; color: #374151; padding: .35rem .75rem; border-radius: 6px; font-size: .85rem; cursor: pointer; font-weight: 500; }
     .import-btn:hover { background: #e5e7eb; }
     .import-status { font-size: .8rem; color: #6b7280; }
+    .bulk-del-btn { display: none; background: #dc2626; border: none; color: #fff; padding: .35rem .75rem; border-radius: 6px; font-size: .85rem; cursor: pointer; font-weight: 500; }
+    .bulk-del-btn:hover { background: #b91c1c; }
+    .bulk-del-btn.visible { display: inline-block; }
+    th.cb-col, td.cb-col { width: 2rem; padding-left: .75rem; }
   </style>
 </head>
 <body>
@@ -142,6 +146,7 @@
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem">
       <h2 style="margin-bottom:0">Transakcje</h2>
       <div style="display:flex;align-items:center;gap:.75rem">
+        <button type="button" class="bulk-del-btn" id="bulk-del-btn">Usuń zaznaczone</button>
         <span class="import-status" id="import-status"></span>
         <input type="file" id="import-file" accept=".txt,.csv" style="display:none">
         <button type="button" class="import-btn" id="import-btn">Importuj wyciag</button>
@@ -150,6 +155,7 @@
     <table>
       <thead>
         <tr>
+          <th class="cb-col"><input type="checkbox" id="select-all"></th>
           <th>Data</th>
           <th>Tytuł</th>
           <th>Odbiorca</th>
@@ -311,6 +317,13 @@
     const sorted = [...filtered].sort((a, b) => b.date.localeCompare(a.date));
     sorted.forEach(t => {
       const tr = document.createElement('tr');
+      const tdCb = document.createElement('td');
+      tdCb.className = 'cb-col';
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.className = 'row-cb';
+      cb.dataset.id = t.id;
+      tdCb.appendChild(cb);
       const tdDate = document.createElement('td');
       tdDate.textContent = t.date;
       const tdDesc = document.createElement('td');
@@ -336,7 +349,7 @@
       delBtn.title = 'Usuń';
       delBtn.textContent = '✕';
       tdDel.appendChild(delBtn);
-      [tdDate, tdDesc, tdOdbiorca, tdComment, tdCat, tdType, tdAmt, tdDel].forEach(td => tr.appendChild(td));
+      [tdCb, tdDate, tdDesc, tdOdbiorca, tdComment, tdCat, tdType, tdAmt, tdDel].forEach(td => tr.appendChild(td));
       list.appendChild(tr);
     });
     emptyMsg.style.display = filtered.length ? 'none' : 'block';
@@ -398,6 +411,34 @@
     if (!btn) return;
     await fetch('/api/transactions/' + btn.dataset.id, {method: 'DELETE'});
     transactions = transactions.filter(t => t.id !== btn.dataset.id);
+    render();
+  });
+
+  list.addEventListener('change', e => {
+    if (!e.target.classList.contains('row-cb')) return;
+    const checked = list.querySelectorAll('.row-cb:checked');
+    document.getElementById('bulk-del-btn').classList.toggle('visible', checked.length > 0);
+    const all = list.querySelectorAll('.row-cb');
+    document.getElementById('select-all').checked = all.length > 0 && checked.length === all.length;
+  });
+
+  document.getElementById('select-all').addEventListener('change', e => {
+    list.querySelectorAll('.row-cb').forEach(cb => { cb.checked = e.target.checked; });
+    const checked = list.querySelectorAll('.row-cb:checked');
+    document.getElementById('bulk-del-btn').classList.toggle('visible', checked.length > 0);
+  });
+
+  document.getElementById('bulk-del-btn').addEventListener('click', async () => {
+    const ids = [...list.querySelectorAll('.row-cb:checked')].map(cb => cb.dataset.id);
+    if (!ids.length) return;
+    await fetch('/api/transactions', {
+      method: 'DELETE',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ids})
+    });
+    transactions = transactions.filter(t => !ids.includes(t.id));
+    document.getElementById('bulk-del-btn').classList.remove('visible');
+    document.getElementById('select-all').checked = false;
     render();
   });
 
