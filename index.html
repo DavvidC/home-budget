@@ -4,11 +4,16 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Domowy Budżet</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: system-ui, sans-serif; background: #f0f2f5; color: #222; }
     header { background: linear-gradient(135deg, #1e40af 0%, #2563eb 60%, #3b82f6 100%); color: #fff; padding: 1.25rem 2rem; box-shadow: 0 2px 8px rgba(37,99,235,.35); }
     header h1 { font-size: 1.5rem; font-weight: 700; letter-spacing: .02em; }
+    .tab-bar { display: flex; background: #fff; border-bottom: 1px solid #e5e7eb; padding: 0 2rem; }
+    .tab { background: none; border: none; padding: .75rem 1.5rem; font-size: .95rem; font-weight: 600; color: #6b7280; cursor: pointer; border-bottom: 2px solid transparent; }
+    .tab.active { color: #2563eb; border-bottom-color: #2563eb; }
+    .tab:hover { color: #2563eb; }
     .filter-bar { background: #fff; padding: .75rem 2rem; border-bottom: 1px solid #e5e7eb; display: flex; flex-direction: column; gap: .5rem; }
     .preset-chips { display: flex; gap: .35rem; flex-wrap: wrap; }
     .preset-chip { padding: .35rem .65rem; border: 1px solid #e5e7eb; border-radius: 6px; font-size: .78rem; cursor: pointer; background: #f9fafb; color: #374151; white-space: nowrap; }
@@ -61,6 +66,14 @@
     .bulk-del-btn:hover { background: #b91c1c; }
     .bulk-del-btn.visible { display: inline-block; }
     th.cb-col, td.cb-col { width: 2rem; padding-left: .75rem; }
+    .charts-panel { display: none; padding: 1.5rem 2rem; }
+    .charts-filter { margin-bottom: 1.5rem; display: flex; align-items: center; gap: .75rem; flex-wrap: wrap; }
+    .charts-filter select { width: auto; }
+    .charts-custom-row { display: none; align-items: center; gap: .5rem; }
+    .charts-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 1.5rem; }
+    .chart-card { background: #fff; border-radius: 10px; padding: 1.5rem; box-shadow: 0 2px 8px rgba(0,0,0,.10), 0 1px 2px rgba(0,0,0,.06); }
+    .chart-card h3 { font-size: .95rem; font-weight: 700; margin-bottom: 1rem; color: #111827; }
+    @media (max-width: 640px) { .charts-grid { grid-template-columns: 1fr; } }
   </style>
 </head>
 <body>
@@ -75,6 +88,11 @@
     </div>
   </div>
 </header>
+
+<div class="tab-bar">
+  <button type="button" class="tab active" id="tab-transakcje">Transakcje</button>
+  <button type="button" class="tab" id="tab-wykresy">Wykresy</button>
+</div>
 
 <div class="filter-bar">
   <div class="preset-chips" id="preset-chips">
@@ -169,6 +187,32 @@
       <tbody id="txn-list"></tbody>
     </table>
     <div class="empty" id="empty-msg">Brak transakcji.</div>
+  </div>
+</div>
+
+<div class="charts-panel" id="charts-panel">
+  <div class="charts-filter">
+    <select id="charts-month-select"></select>
+    <div class="charts-custom-row" id="charts-custom-row">
+      <label style="margin:0">Od:</label>
+      <input type="date" id="charts-from" style="width:auto">
+      <label style="margin:0">Do:</label>
+      <input type="date" id="charts-to" style="width:auto">
+    </div>
+  </div>
+  <div class="charts-grid">
+    <div class="chart-card">
+      <h3>Wydatki wg kategorii</h3>
+      <canvas id="chart-donut"></canvas>
+    </div>
+    <div class="chart-card">
+      <h3>Trend miesięczny</h3>
+      <canvas id="chart-trend"></canvas>
+    </div>
+    <div class="chart-card">
+      <h3>Top 10 odbiorców</h3>
+      <canvas id="chart-top10"></canvas>
+    </div>
   </div>
 </div>
 
@@ -444,6 +488,207 @@
     render();
   });
 
+  // --- Charts ---
+  const PL_MONTHS_SHORT = ['Sty','Lut','Mar','Kwi','Maj','Cze','Lip','Sie','Wrz','Paź','Lis','Gru'];
+  const PL_MONTHS_FULL = ['Styczeń','Luty','Marzec','Kwiecień','Maj','Czerwiec','Lipiec','Sierpień','Wrzesień','Październik','Listopad','Grudzień'];
+  const CHART_COLORS = ['#2563eb','#dc2626','#16a34a','#f59e0b','#8b5cf6','#ec4899','#06b6d4','#84cc16','#f97316','#6366f1','#14b8a6','#e11d48','#a855f7','#eab308','#0ea5e9','#d946ef'];
+
+  let chartsActive = false;
+  let donutChart = null, trendChart = null, top10Chart = null;
+  let chartFilterFrom = '', chartFilterTo = '';
+
+  document.getElementById('tab-transakcje').addEventListener('click', () => {
+    chartsActive = false;
+    document.getElementById('tab-transakcje').classList.add('active');
+    document.getElementById('tab-wykresy').classList.remove('active');
+    document.querySelector('.filter-bar').style.display = '';
+    document.querySelector('.summary').style.display = '';
+    document.querySelector('.main').style.display = '';
+    document.getElementById('charts-panel').style.display = 'none';
+  });
+
+  document.getElementById('tab-wykresy').addEventListener('click', () => {
+    chartsActive = true;
+    document.getElementById('tab-wykresy').classList.add('active');
+    document.getElementById('tab-transakcje').classList.remove('active');
+    document.querySelector('.filter-bar').style.display = 'none';
+    document.querySelector('.summary').style.display = 'none';
+    document.querySelector('.main').style.display = 'none';
+    document.getElementById('charts-panel').style.display = '';
+    buildChartsFilter();
+    renderCharts();
+  });
+
+  function buildChartsFilter() {
+    const sel = document.getElementById('charts-month-select');
+    const prevVal = sel.value;
+    const months = new Set();
+    transactions.forEach(t => { months.add(t.date.slice(0, 7)); });
+    const now = new Date();
+    const curMonth = toYMD(now).slice(0, 7);
+    months.add(curMonth);
+    const sorted = [...months].sort().reverse();
+    sel.innerHTML = '';
+    sorted.forEach(ym => {
+      const [y, m] = ym.split('-');
+      const opt = document.createElement('option');
+      opt.value = ym;
+      opt.textContent = PL_MONTHS_FULL[parseInt(m, 10) - 1] + ' ' + y;
+      sel.appendChild(opt);
+    });
+    const customOpt = document.createElement('option');
+    customOpt.value = 'custom';
+    customOpt.textContent = 'Niestandardowy';
+    sel.appendChild(customOpt);
+
+    if (prevVal && [...sel.options].some(o => o.value === prevVal)) {
+      sel.value = prevVal;
+    } else {
+      sel.value = curMonth;
+    }
+    setChartDateRange(sel.value);
+  }
+
+  function setChartDateRange(val) {
+    if (val === 'custom') {
+      document.getElementById('charts-custom-row').style.display = 'flex';
+      const fromEl = document.getElementById('charts-from');
+      const toEl = document.getElementById('charts-to');
+      if (!fromEl.value) fromEl.value = toYMD(new Date());
+      if (!toEl.value) toEl.value = toYMD(new Date());
+      chartFilterFrom = fromEl.value;
+      chartFilterTo = toEl.value;
+    } else {
+      document.getElementById('charts-custom-row').style.display = 'none';
+      const [y, m] = val.split('-');
+      chartFilterFrom = val + '-01';
+      chartFilterTo = toYMD(new Date(parseInt(y), parseInt(m), 0));
+    }
+  }
+
+  document.getElementById('charts-month-select').addEventListener('change', e => {
+    setChartDateRange(e.target.value);
+    renderCharts();
+  });
+
+  document.getElementById('charts-from').addEventListener('change', () => {
+    chartFilterFrom = document.getElementById('charts-from').value;
+    renderCharts();
+  });
+
+  document.getElementById('charts-to').addEventListener('change', () => {
+    chartFilterTo = document.getElementById('charts-to').value;
+    renderCharts();
+  });
+
+  const centerTextPlugin = {
+    id: 'centerText',
+    afterDraw(chart) {
+      if (chart.config.type !== 'doughnut') return;
+      const { ctx, chartArea: { top, bottom, left, right } } = chart;
+      const cx = (left + right) / 2;
+      const cy = (top + bottom) / 2;
+      ctx.save();
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.font = 'bold 16px system-ui';
+      ctx.fillStyle = '#222';
+      ctx.fillText(chart._centerLabel || '', cx, cy);
+      ctx.restore();
+    }
+  };
+
+  function renderCharts() {
+    renderDonut();
+    renderTrend();
+    renderTop10();
+  }
+
+  function renderDonut() {
+    const filtered = transactions.filter(t => t.type === 'expense' && t.date >= chartFilterFrom && t.date <= chartFilterTo);
+    const byCategory = {};
+    filtered.forEach(t => {
+      const cat = t.category || 'Inne';
+      byCategory[cat] = (byCategory[cat] || 0) + t.amountCents;
+    });
+    const labels = Object.keys(byCategory);
+    const data = Object.values(byCategory).map(v => v / 100);
+    const total = data.reduce((s, v) => s + v, 0);
+
+    if (donutChart) donutChart.destroy();
+    donutChart = new Chart(document.getElementById('chart-donut'), {
+      type: 'doughnut',
+      data: {
+        labels,
+        datasets: [{ data, backgroundColor: CHART_COLORS.slice(0, labels.length), borderWidth: 1 }]
+      },
+      plugins: [centerTextPlugin],
+      options: {
+        responsive: true,
+        plugins: { legend: { position: 'bottom' } }
+      }
+    });
+    donutChart._centerLabel = fmt(total);
+  }
+
+  function renderTrend() {
+    const now = new Date();
+    const months = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      months.push({ key: toYMD(d).slice(0, 7), label: PL_MONTHS_SHORT[d.getMonth()] + ' ' + String(d.getFullYear()).slice(2) });
+    }
+    const incomeData = months.map(m =>
+      transactions.filter(t => t.type === 'income' && t.date.startsWith(m.key)).reduce((s, t) => s + t.amountCents, 0) / 100
+    );
+    const expenseData = months.map(m =>
+      transactions.filter(t => t.type === 'expense' && t.date.startsWith(m.key)).reduce((s, t) => s + t.amountCents, 0) / 100
+    );
+
+    if (trendChart) trendChart.destroy();
+    trendChart = new Chart(document.getElementById('chart-trend'), {
+      type: 'bar',
+      data: {
+        labels: months.map(m => m.label),
+        datasets: [
+          { label: 'Przychody', data: incomeData, backgroundColor: '#16a34a' },
+          { label: 'Wydatki', data: expenseData, backgroundColor: '#dc2626' }
+        ]
+      },
+      options: {
+        responsive: true,
+        plugins: { legend: { position: 'bottom' } },
+        scales: { y: { beginAtZero: true } }
+      }
+    });
+  }
+
+  function renderTop10() {
+    const filtered = transactions.filter(t => t.type === 'expense' && t.date >= chartFilterFrom && t.date <= chartFilterTo && t.odbiorca);
+    const byOdbiorca = {};
+    filtered.forEach(t => {
+      byOdbiorca[t.odbiorca] = (byOdbiorca[t.odbiorca] || 0) + t.amountCents;
+    });
+    const sorted = Object.entries(byOdbiorca).sort((a, b) => b[1] - a[1]).slice(0, 10);
+    const labels = sorted.map(e => e[0]);
+    const data = sorted.map(e => e[1] / 100);
+
+    if (top10Chart) top10Chart.destroy();
+    top10Chart = new Chart(document.getElementById('chart-top10'), {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [{ data, backgroundColor: '#2563eb', borderWidth: 1 }]
+      },
+      options: {
+        indexAxis: 'y',
+        responsive: true,
+        plugins: { legend: { display: false } },
+        scales: { x: { beginAtZero: true } }
+      }
+    });
+  }
+
   document.getElementById('date').valueAsDate = new Date();
   await loadData();
   buildCategorySelect();
@@ -452,7 +697,12 @@
   setInterval(async () => {
     await loadData();
     buildCategorySelect();
-    render();
+    if (chartsActive) {
+      buildChartsFilter();
+      renderCharts();
+    } else {
+      render();
+    }
   }, 10000);
   } // end initApp
 </script>
