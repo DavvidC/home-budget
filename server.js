@@ -27,7 +27,7 @@ async function initDB() {
 const app = express();
 
 app.use(express.json());
-app.use(express.text());
+app.use(express.text({ limit: '5mb' }));
 
 // ---------------------------------------------------------------------------
 // Auth
