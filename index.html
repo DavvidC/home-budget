@@ -55,6 +55,9 @@
     .user-name { font-size: .9rem; opacity: .9; }
     .logout-btn { background: rgba(255,255,255,.15); border: 1px solid rgba(255,255,255,.3); color: #fff; padding: .35rem .75rem; border-radius: 6px; font-size: .85rem; cursor: pointer; }
     .logout-btn:hover { background: rgba(255,255,255,.25); }
+    .import-btn { background: #f3f4f6; border: 1px solid #d1d5db; color: #374151; padding: .35rem .75rem; border-radius: 6px; font-size: .85rem; cursor: pointer; font-weight: 500; }
+    .import-btn:hover { background: #e5e7eb; }
+    .import-status { font-size: .8rem; color: #6b7280; }
   </style>
 </head>
 <body>
@@ -126,11 +129,20 @@
   </div>
 
   <div class="transactions-section">
-    <h2>Transakcje</h2>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem">
+      <h2 style="margin-bottom:0">Transakcje</h2>
+      <div style="display:flex;align-items:center;gap:.75rem">
+        <span class="import-status" id="import-status"></span>
+        <input type="file" id="import-file" accept=".txt" style="display:none">
+        <button type="button" class="import-btn" id="import-btn">Importuj wyciag</button>
+      </div>
+    </div>
     <table>
       <thead>
         <tr>
           <th>Data</th>
+          <th>Tytuł</th>
+          <th>Odbiorca</th>
           <th>Opis</th>
           <th>Kategoria</th>
           <th>Typ</th>
@@ -291,6 +303,11 @@
       tdDate.textContent = t.date;
       const tdDesc = document.createElement('td');
       tdDesc.textContent = t.desc;
+      const tdOdbiorca = document.createElement('td');
+      tdOdbiorca.textContent = t.odbiorca || '';
+      const tdComment = document.createElement('td');
+      const commentText = t.comment || '';
+      tdComment.textContent = commentText.length > 40 ? commentText.slice(0, 40) + '…' : commentText;
       const tdCat = document.createElement('td');
       tdCat.textContent = t.category || '—';
       const tdType = document.createElement('td');
@@ -307,7 +324,7 @@
       delBtn.title = 'Usuń';
       delBtn.textContent = '✕';
       tdDel.appendChild(delBtn);
-      [tdDate, tdDesc, tdCat, tdType, tdAmt, tdDel].forEach(td => tr.appendChild(td));
+      [tdDate, tdDesc, tdOdbiorca, tdComment, tdCat, tdType, tdAmt, tdDel].forEach(td => tr.appendChild(td));
       list.appendChild(tr);
     });
     emptyMsg.style.display = filtered.length ? 'none' : 'block';
@@ -318,6 +335,29 @@
     document.getElementById('total-expenses').textContent = fmt(expenses / 100);
     document.getElementById('balance').textContent = fmt((income - expenses) / 100);
   }
+
+  document.getElementById('import-btn').addEventListener('click', () => {
+    document.getElementById('import-file').click();
+  });
+
+  document.getElementById('import-file').addEventListener('change', async e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const text = await file.text();
+    const res = await fetch('/api/import', {
+      method: 'POST',
+      headers: {'Content-Type': 'text/plain'},
+      body: text
+    });
+    const result = await res.json();
+    document.getElementById('import-status').textContent =
+      `Zaimportowano ${result.imported} transakcji (Pominieto ${result.skipped} duplikatow)`;
+    e.target.value = '';
+    await loadData();
+    buildYearSelect();
+    buildMonthTabs();
+    render();
+  });
 
   form.addEventListener('submit', async e => {
     e.preventDefault();

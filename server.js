@@ -18,6 +18,8 @@ async function initDB() {
     CREATE TABLE IF NOT EXISTS categories (
       name TEXT PRIMARY KEY
     );
+    ALTER TABLE transactions ADD COLUMN IF NOT EXISTS odbiorca TEXT;
+    ALTER TABLE transactions ADD COLUMN IF NOT EXISTS comment TEXT;
   `);
   console.log('DB ready');
 }
@@ -25,6 +27,7 @@ async function initDB() {
 const app = express();
 
 app.use(express.json());
+app.use(express.text());
 
 // ---------------------------------------------------------------------------
 // Auth
@@ -156,6 +159,39 @@ app.post('/api/categories', requireAuth, async (req, res) => {
   try {
     await pool.query('INSERT INTO categories(name) VALUES($1) ON CONFLICT DO NOTHING', [req.body.name]);
     res.status(201).json(req.body);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post('/api/import', requireAuth, async (req, res) => {
+  try {
+    const lines = (req.body || '').split(/\r?\n/);
+    let imported = 0, skipped = 0;
+    for (const line of lines) {
+      const cols = line.split('\t');
+      if (cols.length < 10) continue;
+      const dateRaw = cols[0].trim();
+      if (!/^\d{2}\.\d{2}\.\d{4}$/.test(dateRaw)) continue;
+      const [day, month, year] = dateRaw.split('.');
+      const date = `${year}-${month}-${day}`;
+      const amountStr = cols[3].trim().replace(/\s/g, '').replace(',', '.');
+      const amountFloat = parseFloat(amountStr);
+      if (isNaN(amountFloat)) continue;
+      const amountCents = Math.round(Math.abs(amountFloat) * 100);
+      const type = amountFloat >= 0 ? 'income' : 'expense';
+      const comment = (cols[6] || '').trim();
+      const odbiorca = (cols[7] || '').trim();
+      const refNum = (cols[9] || '').trim();
+      const id = refNum || crypto.createHash('sha256').update(`${date}|${amountFloat}`).digest('hex').slice(0, 36);
+      const data = { id, date, amountCents, type, category: 'Inne', desc: comment, odbiorca, comment };
+      const result = await pool.query(
+        'INSERT INTO transactions(id, data, odbiorca, comment) VALUES($1, $2, $3, $4) ON CONFLICT (id) DO NOTHING',
+        [id, data, odbiorca, comment]
+      );
+      if (result.rowCount > 0) imported++; else skipped++;
+    }
+    res.json({ imported, skipped });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
