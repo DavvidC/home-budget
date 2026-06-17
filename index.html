@@ -144,8 +144,6 @@
           <th>Tytuł</th>
           <th>Odbiorca</th>
           <th>Opis</th>
-          <th>Rach. źródłowy</th>
-          <th>Rach. docelowy</th>
           <th>Kategoria</th>
           <th>Typ</th>
           <th>Kwota</th>
@@ -310,12 +308,6 @@
       const tdComment = document.createElement('td');
       const commentText = t.comment || '';
       tdComment.textContent = commentText.length > 40 ? commentText.slice(0, 40) + '…' : commentText;
-      const tdZrodlowy = document.createElement('td');
-      const z = t.zrodlowy || '';
-      tdZrodlowy.textContent = z.length > 10 ? '…' + z.slice(-10) : z;
-      const tdDocelowy = document.createElement('td');
-      const d = t.docelowy || '';
-      tdDocelowy.textContent = d.length > 10 ? '…' + d.slice(-10) : d;
       const tdCat = document.createElement('td');
       tdCat.textContent = t.category || '—';
       const tdType = document.createElement('td');
@@ -332,7 +324,7 @@
       delBtn.title = 'Usuń';
       delBtn.textContent = '✕';
       tdDel.appendChild(delBtn);
-      [tdDate, tdDesc, tdOdbiorca, tdComment, tdZrodlowy, tdDocelowy, tdCat, tdType, tdAmt, tdDel].forEach(td => tr.appendChild(td));
+      [tdDate, tdDesc, tdOdbiorca, tdComment, tdCat, tdType, tdAmt, tdDel].forEach(td => tr.appendChild(td));
       list.appendChild(tr);
     });
     emptyMsg.style.display = filtered.length ? 'none' : 'block';
