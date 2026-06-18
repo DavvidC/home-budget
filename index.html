@@ -118,6 +118,8 @@
     #txn-list tr { transition: background .15s; }
     #txn-list tr:hover { background: #eef2ff; }
     .amt-right { text-align: right; }
+    .sortable { cursor: pointer; user-select: none; }
+    .sortable:hover { color: #2563eb; }
     .editable-cell { border-bottom: 1px dotted #d1d5db; cursor: pointer; }
     .editable-cell:hover { border-bottom-style: solid; border-bottom-color: #2563eb; }
     .card.income { border-left: 4px solid #16a34a; }
@@ -235,7 +237,7 @@
           <th>Tytuł</th>
           <th>Odbiorca</th>
           <th>Opis</th>
-          <th>Kategoria</th>
+          <th class="sortable" id="sort-kategoria" title="Sortuj">Kategoria <span id="sort-arrow"></span></th>
           <th>Typ</th>
           <th class="amt-right">Kwota</th>
           <th></th>
@@ -386,6 +388,14 @@
   let filterFrom = '';
   let filterTo = '';
   let activePreset = 'month';
+  let categorySortDir = null;
+
+  document.getElementById('sort-kategoria').addEventListener('click', () => {
+    if (!categorySortDir) categorySortDir = 'asc';
+    else if (categorySortDir === 'asc') categorySortDir = 'desc';
+    else categorySortDir = null;
+    render();
+  });
 
   function setPreset(preset) {
     activePreset = preset;
@@ -484,7 +494,16 @@
     document.getElementById('select-all').checked = false;
     list.innerHTML = '';
     const filtered = transactions.filter(t => t.date >= filterFrom && t.date <= filterTo);
-    const sorted = [...filtered].sort((a, b) => b.date.localeCompare(a.date));
+    let sorted;
+    if (categorySortDir === 'asc') {
+      sorted = [...filtered].sort((a, b) => (a.category || '').localeCompare(b.category || '', 'pl'));
+    } else if (categorySortDir === 'desc') {
+      sorted = [...filtered].sort((a, b) => (b.category || '').localeCompare(a.category || '', 'pl'));
+    } else {
+      sorted = [...filtered].sort((a, b) => b.date.localeCompare(a.date));
+    }
+    const arrow = document.getElementById('sort-arrow');
+    arrow.textContent = categorySortDir === 'asc' ? '▲' : categorySortDir === 'desc' ? '▼' : '';
     sorted.forEach(t => {
       const tr = document.createElement('tr');
       const tdCb = document.createElement('td');
