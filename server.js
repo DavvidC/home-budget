@@ -25,8 +25,72 @@ async function initDB() {
       category TEXT PRIMARY KEY,
       limit_cents INTEGER NOT NULL
     );
+    ALTER TABLE budgets ADD COLUMN IF NOT EXISTS alerted_80 TEXT NOT NULL DEFAULT '';
+    ALTER TABLE budgets ADD COLUMN IF NOT EXISTS alerted_100 TEXT NOT NULL DEFAULT '';
   `);
   console.log('DB ready');
+}
+
+function fmtPLN(cents) {
+  return (cents / 100).toFixed(2).replace('.', ',') + ' zł';
+}
+
+async function checkBudgetAlerts(category) {
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  const chatIds = (process.env.TELEGRAM_CHAT_IDS || '').split(',').map(s => s.trim()).filter(Boolean);
+  if (!token || chatIds.length === 0) return;
+
+  const now = new Date();
+  const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  const monthStart = monthKey + '-01';
+  const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+  const monthEnd = `${nextMonth.getFullYear()}-${String(nextMonth.getMonth() + 1).padStart(2, '0')}-01`;
+
+  const { rows: budgets } = await pool.query(
+    'SELECT category, limit_cents, alerted_80, alerted_100 FROM budgets WHERE category = $1',
+    [category]
+  );
+  if (budgets.length === 0) return;
+
+  const budget = budgets[0];
+  const { rows: spending } = await pool.query(
+    `SELECT COALESCE(SUM((data->>'amountCents')::int), 0) AS total
+     FROM transactions
+     WHERE data->>'category' = $1
+       AND data->>'type' = 'expense'
+       AND data->>'date' >= $2
+       AND data->>'date' < $3`,
+    [category, monthStart, monthEnd]
+  );
+
+  const spent = spending[0].total;
+  const pct = spent / budget.limit_cents;
+
+  const alerts = [];
+  if (pct >= 1 && !budget.alerted_100.includes(monthKey)) {
+    alerts.push({ level: 100, emoji: '🔴' });
+    await pool.query(
+      'UPDATE budgets SET alerted_100 = $2 WHERE category = $1',
+      [category, monthKey]
+    );
+  } else if (pct >= 0.8 && pct < 1 && !budget.alerted_80.includes(monthKey)) {
+    alerts.push({ level: 80, emoji: '🟡' });
+    await pool.query(
+      'UPDATE budgets SET alerted_80 = $2 WHERE category = $1',
+      [category, monthKey]
+    );
+  }
+
+  for (const alert of alerts) {
+    const text = `${alert.emoji} Budżet "${category}" — ${alert.level}%\nWydano: ${fmtPLN(spent)} z ${fmtPLN(budget.limit_cents)}`;
+    for (const chatId of chatIds) {
+      fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chat_id: chatId, text })
+      }).catch(() => {});
+    }
+  }
 }
 
 const app = express();
@@ -136,6 +200,9 @@ app.post('/api/transactions', requireAuth, async (req, res) => {
   try {
     const txn = { id: crypto.randomUUID(), ...req.body };
     await pool.query('INSERT INTO transactions(id, data) VALUES($1, $2)', [txn.id, txn]);
+    if (txn.type === 'expense' && txn.category) {
+      checkBudgetAlerts(txn.category).catch(() => {});
+    }
     res.status(201).json(txn);
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -206,6 +273,7 @@ app.post('/api/import', requireAuth, async (req, res) => {
     const isCSV = sep === ';';
 
     let imported = 0, skipped = 0;
+    const importedCategories = new Set();
     for (const line of lines) {
       const cols = line.split(sep);
       if (cols.length < 10) continue;
@@ -249,7 +317,15 @@ app.post('/api/import', requireAuth, async (req, res) => {
         'INSERT INTO transactions(id, data, odbiorca, comment) VALUES($1, $2, $3, $4) ON CONFLICT (id) DO NOTHING',
         [id, data, odbiorca, comment]
       );
-      if (result.rowCount > 0) imported++; else skipped++;
+      if (result.rowCount > 0) {
+        imported++;
+        if (type === 'expense' && category) importedCategories.add(category);
+      } else {
+        skipped++;
+      }
+    }
+    for (const cat of importedCategories) {
+      checkBudgetAlerts(cat).catch(() => {});
     }
     res.json({ imported, skipped });
   } catch (e) {
@@ -273,7 +349,9 @@ app.post('/api/budgets', requireAuth, async (req, res) => {
   try {
     const { category, limitCents } = req.body;
     const { rows } = await pool.query(
-      'INSERT INTO budgets(category, limit_cents) VALUES($1, $2) ON CONFLICT (category) DO UPDATE SET limit_cents = $2 RETURNING category, limit_cents AS "limitCents"',
+      `INSERT INTO budgets(category, limit_cents, alerted_80, alerted_100) VALUES($1, $2, '', '')
+       ON CONFLICT (category) DO UPDATE SET limit_cents = $2, alerted_80 = '', alerted_100 = ''
+       RETURNING category, limit_cents AS "limitCents"`,
       [category, limitCents]
     );
     res.json(rows[0]);
