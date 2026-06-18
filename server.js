@@ -26,6 +26,7 @@ async function initDB() {
       limit_cents INTEGER NOT NULL
     );
     ALTER TABLE budgets ADD COLUMN IF NOT EXISTS alerted_80 TEXT NOT NULL DEFAULT '';
+    ALTER TABLE budgets ADD COLUMN IF NOT EXISTS alerted_90 TEXT NOT NULL DEFAULT '';
     ALTER TABLE budgets ADD COLUMN IF NOT EXISTS alerted_100 TEXT NOT NULL DEFAULT '';
   `);
   console.log('DB ready');
@@ -47,7 +48,7 @@ async function checkBudgetAlerts(category) {
   const monthEnd = `${nextMonth.getFullYear()}-${String(nextMonth.getMonth() + 1).padStart(2, '0')}-01`;
 
   const { rows: budgets } = await pool.query(
-    'SELECT category, limit_cents, alerted_80, alerted_100 FROM budgets WHERE category = $1',
+    'SELECT category, limit_cents, alerted_80, alerted_90, alerted_100 FROM budgets WHERE category = $1',
     [category]
   );
   if (budgets.length === 0) return;
@@ -67,14 +68,20 @@ async function checkBudgetAlerts(category) {
   const pct = spent / budget.limit_cents;
 
   const alerts = [];
-  if (pct >= 1 && !budget.alerted_100.includes(monthKey)) {
-    alerts.push({ level: 100, emoji: '🔴' });
+  if (pct >= 1 && budget.alerted_100 !== monthKey) {
+    alerts.push({ level: 100, emoji: '🔴', msg: 'Przekroczono budżet!' });
     await pool.query(
-      'UPDATE budgets SET alerted_100 = $2 WHERE category = $1',
+      'UPDATE budgets SET alerted_100 = $2, alerted_90 = $2, alerted_80 = $2 WHERE category = $1',
       [category, monthKey]
     );
-  } else if (pct >= 0.8 && pct < 1 && !budget.alerted_80.includes(monthKey)) {
-    alerts.push({ level: 80, emoji: '🟡' });
+  } else if (pct >= 0.9 && budget.alerted_90 !== monthKey) {
+    alerts.push({ level: 90, emoji: '🟠', msg: 'Zostało tylko 10%' });
+    await pool.query(
+      'UPDATE budgets SET alerted_90 = $2, alerted_80 = $2 WHERE category = $1',
+      [category, monthKey]
+    );
+  } else if (pct >= 0.8 && budget.alerted_80 !== monthKey) {
+    alerts.push({ level: 80, emoji: '🟡', msg: 'Zbliżasz się do limitu' });
     await pool.query(
       'UPDATE budgets SET alerted_80 = $2 WHERE category = $1',
       [category, monthKey]
@@ -82,7 +89,7 @@ async function checkBudgetAlerts(category) {
   }
 
   for (const alert of alerts) {
-    const text = `${alert.emoji} Budżet "${category}" — ${alert.level}%\nWydano: ${fmtPLN(spent)} z ${fmtPLN(budget.limit_cents)}`;
+    const text = `${alert.emoji} Budżet "${category}" — ${Math.round(pct * 100)}%\n${alert.msg}\nWydano: ${fmtPLN(spent)} z ${fmtPLN(budget.limit_cents)}`;
     for (const chatId of chatIds) {
       fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
         method: 'POST',
@@ -349,8 +356,8 @@ app.post('/api/budgets', requireAuth, async (req, res) => {
   try {
     const { category, limitCents } = req.body;
     const { rows } = await pool.query(
-      `INSERT INTO budgets(category, limit_cents, alerted_80, alerted_100) VALUES($1, $2, '', '')
-       ON CONFLICT (category) DO UPDATE SET limit_cents = $2, alerted_80 = '', alerted_100 = ''
+      `INSERT INTO budgets(category, limit_cents, alerted_80, alerted_90, alerted_100) VALUES($1, $2, '', '', '')
+       ON CONFLICT (category) DO UPDATE SET limit_cents = $2, alerted_80 = '', alerted_90 = '', alerted_100 = ''
        RETURNING category, limit_cents AS "limitCents"`,
       [category, limitCents]
     );
