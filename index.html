@@ -235,7 +235,7 @@
           <th class="cb-col"><input type="checkbox" id="select-all"></th>
           <th>Data</th>
           <th>Tytuł</th>
-          <th>Odbiorca</th>
+          <th class="sortable" id="sort-odbiorca" title="Sortuj">Odbiorca <span id="sort-arrow-odb"></span></th>
           <th>Opis</th>
           <th class="sortable" id="sort-kategoria" title="Sortuj">Kategoria <span id="sort-arrow"></span></th>
           <th>Typ</th>
@@ -389,11 +389,21 @@
   let filterTo = '';
   let activePreset = 'month';
   let categorySortDir = null;
+  let odbiorcaSortDir = null;
 
   document.getElementById('sort-kategoria').addEventListener('click', () => {
+    odbiorcaSortDir = null;
     if (!categorySortDir) categorySortDir = 'asc';
     else if (categorySortDir === 'asc') categorySortDir = 'desc';
     else categorySortDir = null;
+    render();
+  });
+
+  document.getElementById('sort-odbiorca').addEventListener('click', () => {
+    categorySortDir = null;
+    if (!odbiorcaSortDir) odbiorcaSortDir = 'asc';
+    else if (odbiorcaSortDir === 'asc') odbiorcaSortDir = 'desc';
+    else odbiorcaSortDir = null;
     render();
   });
 
@@ -499,11 +509,15 @@
       sorted = [...filtered].sort((a, b) => (a.category || '').localeCompare(b.category || '', 'pl'));
     } else if (categorySortDir === 'desc') {
       sorted = [...filtered].sort((a, b) => (b.category || '').localeCompare(a.category || '', 'pl'));
+    } else if (odbiorcaSortDir === 'asc') {
+      sorted = [...filtered].sort((a, b) => (a.odbiorca || '').localeCompare(b.odbiorca || '', 'pl'));
+    } else if (odbiorcaSortDir === 'desc') {
+      sorted = [...filtered].sort((a, b) => (b.odbiorca || '').localeCompare(a.odbiorca || '', 'pl'));
     } else {
       sorted = [...filtered].sort((a, b) => b.date.localeCompare(a.date));
     }
-    const arrow = document.getElementById('sort-arrow');
-    arrow.textContent = categorySortDir === 'asc' ? '▲' : categorySortDir === 'desc' ? '▼' : '';
+    document.getElementById('sort-arrow').textContent = categorySortDir === 'asc' ? '▲' : categorySortDir === 'desc' ? '▼' : '';
+    document.getElementById('sort-arrow-odb').textContent = odbiorcaSortDir === 'asc' ? '▲' : odbiorcaSortDir === 'desc' ? '▼' : '';
     sorted.forEach(t => {
       const tr = document.createElement('tr');
       const tdCb = document.createElement('td');
