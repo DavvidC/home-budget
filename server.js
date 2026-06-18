@@ -25,6 +25,7 @@ async function initDB() {
       category TEXT PRIMARY KEY,
       limit_cents INTEGER NOT NULL
     );
+    ALTER TABLE budgets ADD COLUMN IF NOT EXISTS alerted_50 TEXT NOT NULL DEFAULT '';
     ALTER TABLE budgets ADD COLUMN IF NOT EXISTS alerted_80 TEXT NOT NULL DEFAULT '';
     ALTER TABLE budgets ADD COLUMN IF NOT EXISTS alerted_90 TEXT NOT NULL DEFAULT '';
     ALTER TABLE budgets ADD COLUMN IF NOT EXISTS alerted_100 TEXT NOT NULL DEFAULT '';
@@ -48,7 +49,7 @@ async function checkBudgetAlerts(category) {
   const monthEnd = `${nextMonth.getFullYear()}-${String(nextMonth.getMonth() + 1).padStart(2, '0')}-01`;
 
   const { rows: budgets } = await pool.query(
-    'SELECT category, limit_cents, alerted_80, alerted_90, alerted_100 FROM budgets WHERE category = $1',
+    'SELECT category, limit_cents, alerted_50, alerted_80, alerted_90, alerted_100 FROM budgets WHERE category = $1',
     [category]
   );
   if (budgets.length === 0) return;
@@ -83,7 +84,13 @@ async function checkBudgetAlerts(category) {
   } else if (pct >= 0.8 && budget.alerted_80 !== monthKey) {
     alerts.push({ level: 80, emoji: '🟡', msg: 'Zbliżasz się do limitu' });
     await pool.query(
-      'UPDATE budgets SET alerted_80 = $2 WHERE category = $1',
+      'UPDATE budgets SET alerted_80 = $2, alerted_50 = $2 WHERE category = $1',
+      [category, monthKey]
+    );
+  } else if (pct >= 0.5 && budget.alerted_50 !== monthKey) {
+    alerts.push({ level: 50, emoji: '🔵', msg: 'Połowa budżetu wykorzystana' });
+    await pool.query(
+      'UPDATE budgets SET alerted_50 = $2 WHERE category = $1',
       [category, monthKey]
     );
   }
@@ -356,8 +363,8 @@ app.post('/api/budgets', requireAuth, async (req, res) => {
   try {
     const { category, limitCents } = req.body;
     const { rows } = await pool.query(
-      `INSERT INTO budgets(category, limit_cents, alerted_80, alerted_90, alerted_100) VALUES($1, $2, '', '', '')
-       ON CONFLICT (category) DO UPDATE SET limit_cents = $2, alerted_80 = '', alerted_90 = '', alerted_100 = ''
+      `INSERT INTO budgets(category, limit_cents, alerted_50, alerted_80, alerted_90, alerted_100) VALUES($1, $2, '', '', '', '')
+       ON CONFLICT (category) DO UPDATE SET limit_cents = $2, alerted_50 = '', alerted_80 = '', alerted_90 = '', alerted_100 = ''
        RETURNING category, limit_cents AS "limitCents"`,
       [category, limitCents]
     );
